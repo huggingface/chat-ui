@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from "svelte";
 	import { base } from "$app/paths";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 	import { subscribeToTheme } from "$lib/switchTheme";
@@ -10,6 +11,7 @@
 	import {
 		createConsoleReceiver,
 		type ConsoleEntry,
+		type ConsoleState,
 		type FrameConsoleState,
 	} from "$lib/utils/gradioConsole";
 
@@ -52,16 +54,18 @@
 
 	/** undefined while a private space token is fetched, null when there is none */
 	let sign = $state<string | null | undefined>(null);
+	// keyed on the private space id alone, so a new check of the same space keeps its frame
+	let privateSpaceId = $derived(space?.private ? space.spaceId : undefined);
 	$effect(() => {
-		const target = space;
-		if (!target?.private || !conversationId) {
+		const spaceId = privateSpaceId;
+		if (!spaceId || !conversationId) {
 			sign = null;
 			return;
 		}
 		sign = undefined;
 		const abort = new AbortController();
 		fetch(
-			`${base}/conversation/${conversationId}/space-console?space=${encodeURIComponent(target.spaceId)}`,
+			`${base}/conversation/${conversationId}/space-console?space=${encodeURIComponent(spaceId)}`,
 			{ signal: abort.signal }
 		)
 			.then((res) => (res.ok ? res.json() : { sign: null }))
@@ -75,15 +79,16 @@
 	});
 
 	// __theme is read at page load, so a theme toggle reloads the frame
+	let spaceUrl = $derived(space?.url);
 	let frameUrl = $derived.by(() => {
-		if (!space || sign === undefined) return undefined;
+		if (!spaceUrl || sign === undefined) return undefined;
 		try {
-			const url = new URL(space.url);
+			const url = new URL(spaceUrl);
 			url.searchParams.set("__theme", isDark ? "dark" : "light");
 			if (sign) url.searchParams.set("__sign", sign);
 			return url.toString();
 		} catch {
-			return space.url;
+			return spaceUrl;
 		}
 	});
 
@@ -92,17 +97,15 @@
 	let consoleState = $state<FrameConsoleState | null>(null);
 	let forwarded = $state(0);
 
-	const FLUSH_MS = 500;
-	const BATCH_MAX = 50;
+	/** the endpoint takes at most this many entries per post */
+	const POST_MAX = 100;
 
 	type Load = {
 		id: string;
 		conversationId: string;
 		spaceId: string;
+		/** the latest check_space call this load was asked to answer */
 		checkId?: string;
-		pending: ConsoleEntry[];
-		dropped: number;
-		timer?: ReturnType<typeof setTimeout>;
 		/** posts go out one at a time, the server drops a state update that arrives before its load */
 		sent: Promise<unknown>;
 	};
@@ -113,30 +116,29 @@
 			fetch(`${base}/conversation/${load.conversationId}/space-console`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					space: load.spaceId,
-					load: load.id,
-					...(load.checkId ? { check: load.checkId } : {}),
-					...body,
-				}),
+				body: JSON.stringify({ space: load.spaceId, load: load.id, ...body }),
 			}).catch(() => {});
 		load.sent = load.sent.then(send, send);
 	}
 
-	function flush(load: Load) {
-		clearTimeout(load.timer);
-		load.timer = undefined;
-		while (load.pending.length || load.dropped) {
-			post(load, { entries: load.pending.splice(0, BATCH_MAX), dropped: load.dropped });
-			load.dropped = 0;
+	function postSnapshot(load: Load, snapshot: ConsoleState) {
+		const chunks: ConsoleEntry[][] = [];
+		for (let i = 0; i < snapshot.entries.length; i += POST_MAX) {
+			chunks.push(snapshot.entries.slice(i, i + POST_MAX));
 		}
-	}
-
-	function queue(load: Load, entries: ConsoleEntry[], dropped: number) {
-		load.pending.push(...entries);
-		load.dropped += dropped;
-		if (load.pending.length >= BATCH_MAX) flush(load);
-		else load.timer ??= setTimeout(() => flush(load), FLUSH_MS);
+		if (!chunks.length) chunks.push([]);
+		chunks.forEach((entries, i) =>
+			post(load, {
+				session_id: snapshot.session_id,
+				gradio_version: snapshot.gradio_version,
+				dropped: snapshot.dropped,
+				entries,
+				// on the last post, so the whole reply is stored before the check reads it
+				...(i === chunks.length - 1 && typeof snapshot.id === "string"
+					? { answers: snapshot.id }
+					: {}),
+			})
+		);
 	}
 
 	// only the owner forwards, a shared view shows the space and nothing more
@@ -145,19 +147,19 @@
 		return createConsoleReceiver({
 			frame: () => frame?.contentWindow,
 			origin,
-			onState(state, ack) {
+			onState(state, reply) {
 				consoleState = state;
 				const load = current;
 				if (!load || state === "connecting") return;
 				post(load, {
 					state,
-					...(ack ? { session_id: ack.session_id, gradio_version: ack.gradio_version } : {}),
+					...(reply ? { session_id: reply.session_id, gradio_version: reply.gradio_version } : {}),
 				});
 			},
-			onEntries(entries, dropped) {
+			onSnapshot(snapshot) {
 				if (!current) return;
-				forwarded += entries.length;
-				queue(current, entries, dropped);
+				forwarded += snapshot.entries.length;
+				postSnapshot(current, snapshot);
 			},
 		});
 	});
@@ -170,34 +172,44 @@
 		return () => {
 			window.removeEventListener("message", onMessage);
 			active.dispose();
-			if (current) flush(current);
 			current = undefined;
 			consoleState = null;
 		};
 	});
 
+	// a check of the space already loaded asks the page it shows, a frame still loading asks on load
+	$effect(() => {
+		const checkId = space?.checkId;
+		const active = receiver;
+		if (!checkId || !active) return;
+		untrack(() => {
+			const load = current;
+			if (!load || load.checkId === checkId) return;
+			load.checkId = checkId;
+			post(load, { check: checkId });
+			active.request(checkId);
+		});
+	});
+
 	function onFrameLoad() {
 		if (!receiver || !space || !conversationId) return;
-		if (current) flush(current);
 		current = {
 			id: crypto.randomUUID(),
 			conversationId,
 			spaceId: space.spaceId,
 			...(space.checkId ? { checkId: space.checkId } : {}),
-			pending: [],
-			dropped: 0,
 			sent: Promise.resolve(),
 		};
 		forwarded = 0;
-		post(current, { state: "loading" });
-		receiver.load();
+		post(current, { state: "loading", ...(current.checkId ? { check: current.checkId } : {}) });
+		receiver.load(current.checkId);
 	}
 
 	const STATUS: Record<FrameConsoleState, { label: string; title: string }> = {
 		connecting: { label: "Console…", title: "Asking the Space for its browser console" },
 		connected: {
 			label: "Console",
-			title: "The Space forwards its browser console to ML Intern while it is open here",
+			title: "ML Intern reads this Space's browser console while it is open here",
 		},
 		unsupported: {
 			label: "No console",
@@ -287,7 +299,7 @@
 					<span class="font-mono text-xxs text-gray-300 dark:text-gray-600">{space.label}</span>
 				</div>
 				{#if frameUrl}
-					{#key `${frameUrl}:${reloadNonce}:${space.checkId ?? ""}`}
+					{#key `${frameUrl}:${reloadNonce}`}
 						<iframe
 							title="Space {space.label}"
 							class="relative h-full w-full {resizing ? 'pointer-events-none' : ''}"

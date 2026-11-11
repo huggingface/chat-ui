@@ -3,21 +3,14 @@ import type { SpaceConsoleEntry } from "$lib/types/SpaceConsole";
 import { readConsoleEntries, readFrame } from "./store";
 
 export interface ConsoleWaits {
-	/** for the tab to get the update, open the pane and report the load */
+	/** for the tab to get the update, open the pane and report it */
 	attachMs: number;
-	/** for the frame to ack, the pane gives up at 5 s */
-	handshakeMs: number;
-	/** after the ack, for page load entries to arrive */
-	settleMs: number;
+	/** for the frame to answer this check, the pane gives a fresh load 5 s */
+	answerMs: number;
 	pollMs: number;
 }
 
-export const CONSOLE_WAITS: ConsoleWaits = {
-	attachMs: 4000,
-	handshakeMs: 6500,
-	settleMs: 2500,
-	pollMs: 250,
-};
+export const CONSOLE_WAITS: ConsoleWaits = { attachMs: 4000, answerMs: 6500, pollMs: 250 };
 
 const SHOW_HEAD = 10;
 const SHOW_TAIL = 30;
@@ -37,7 +30,7 @@ const sleep = (ms: number, signal?: AbortSignal) =>
 		);
 	});
 
-/** waits for the tab to load the space this check opened, then reads what its frame forwarded, never throws */
+/** waits for the tab to ask the space for its console on this check, then reads the reply, never throws */
 export async function consoleSection(params: {
 	conversationId: ObjectId;
 	spaceId: string;
@@ -64,25 +57,31 @@ export async function consoleSection(params: {
 		if (!attached) {
 			return ["Console: no browser tab has this Space open, so its browser console can't be read."];
 		}
-		await until(waits.handshakeMs, async () => {
+		await until(waits.answerMs, async () => {
 			frame = await readFrame(conversationId, spaceId);
-			return frame?.checkId !== checkId || frame.state !== "loading";
+			if (!frame || frame.checkId !== checkId || frame.answeredCheck === checkId) return true;
+			// a load opened for this check already sent its gets and gave up
+			return frame.loadedFor === checkId && frame.state === "unsupported";
 		});
+		if (frame?.answeredCheck === checkId) {
+			const entries = await readConsoleEntries(conversationId, spaceId);
+			return formatConsole(entries, frame.sessionId, frame.gradioVersion, frame.dropped);
+		}
 		if (frame?.checkId !== checkId) {
-			return ["Console: the Space was reloaded in the browser tab; check it again to read it."];
+			return [
+				"Console: the browser tab moved on to another check; check the Space again to read it.",
+			];
 		}
 		if (frame.state === "loading") {
 			return ["Console: the Space is still loading in the browser tab; check it again to read it."];
 		}
 		if (frame.state === "unsupported") {
 			return [
-				"Console: the Space shows in the browser tab, but its frontend does not forward its " +
+				"Console: the Space shows in the browser tab, but its frontend does not answer for its " +
 					"console (a Gradio version without console forwarding, or a custom frontend).",
 			];
 		}
-		await sleep(waits.settleMs, signal);
-		const entries = await readConsoleEntries(conversationId, spaceId);
-		return formatConsole(entries, frame.sessionId, frame.gradioVersion, frame.dropped);
+		return ["Console: the Space did not answer in time; check it again to read it."];
 	} catch (err) {
 		return [`Console: could not be read (${String(err)}).`];
 	}
@@ -109,7 +108,7 @@ export function formatConsole(
 	const out = formatEntries(entries, currentSession, gradioVersion);
 	if (dropped > 0) {
 		out.push(
-			`The frame dropped ${dropped} ${dropped === 1 ? "entry" : "entries"} before forwarding them: it keeps 100 and sends at most 20 batches a second.`
+			`The page dropped ${dropped} older ${dropped === 1 ? "entry" : "entries"}: it keeps the last 100.`
 		);
 	}
 	return out;
@@ -145,14 +144,12 @@ function formatEntries(
 		if (labelled && entry.sessionId !== session) {
 			session = entry.sessionId;
 			const n = sessions.indexOf(session) + 1;
-			out.push(
-				`page load ${n}${session === currentSession ? " (the one this check opened)" : ""}:`
-			);
+			out.push(`page load ${n}${session === currentSession ? " (the page open now)" : ""}:`);
 		}
 		out.push(...formatEntry(entry));
 	}
 	if (currentSession && !sessions.includes(currentSession)) {
-		out.push("The page load this check opened has logged nothing.");
+		out.push("The page open now has logged nothing.");
 	}
 	return out;
 }

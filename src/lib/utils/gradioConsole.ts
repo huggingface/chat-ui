@@ -1,10 +1,10 @@
-/** parent side of the gradio-console protocol v1, which gradio implements as the frame */
+/** parent side of the gradio-console protocol v1 pull model, which gradio implements as the frame */
 
 export const GRADIO_CONSOLE_PROTOCOL = "gradio-console";
 export const GRADIO_CONSOLE_VERSION = 1;
 
-/** init goes out on load and again at these offsets until an ack arrives */
-export const INIT_RETRY_MS = [500, 1500, 3000] as const;
+/** after load, get goes out again at these offsets until a state arrives */
+export const GET_RETRY_MS = [500, 1500, 3000] as const;
 export const UNSUPPORTED_AFTER_MS = 5000;
 
 const TEXT_MAX = 4096;
@@ -20,50 +20,49 @@ export interface ConsoleEntry {
 	stack?: string;
 }
 
-export type ConsoleMessage =
-	| { type: "ack"; session_id: string; gradio_version: string; dropped: number }
-	| { type: "entries"; session_id: string; entries: ConsoleEntry[]; dropped: number };
+export interface ConsoleState {
+	id?: string | number;
+	session_id: string;
+	gradio_version: string;
+	/** total the frame evicted since its page load */
+	dropped: number;
+	entries: ConsoleEntry[];
+}
 
 const clip = (text: string) =>
 	text.length > TEXT_MAX ? `${text.slice(0, TEXT_MAX - 12)}…[truncated]` : text;
 const count = (value: unknown) =>
 	typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 
-/** a frame message or null to ignore it, a higher version is read for the fields v1 knows */
-export function parseConsoleMessage(data: unknown): ConsoleMessage | null {
+/** a frame state or null to ignore the message, a higher version is read for the fields v1 knows */
+export function parseConsoleState(data: unknown): ConsoleState | null {
 	if (!data || typeof data !== "object" || Array.isArray(data)) return null;
 	const msg = data as Record<string, unknown>;
-	if (msg.protocol !== GRADIO_CONSOLE_PROTOCOL) return null;
+	if (msg.protocol !== GRADIO_CONSOLE_PROTOCOL || msg.type !== "state") return null;
 	const sessionId = msg.session_id;
 	if (typeof sessionId !== "string" || !sessionId) return null;
-	if (msg.type === "ack") {
-		return {
-			type: "ack",
+	const entries: ConsoleEntry[] = [];
+	for (const raw of Array.isArray(msg.entries) ? msg.entries : []) {
+		if (!raw || typeof raw !== "object") continue;
+		const { seq, ts, level, text, stack } = raw as Record<string, unknown>;
+		if (typeof seq !== "number" || !Number.isInteger(seq) || seq < 1) continue;
+		if (typeof text !== "string" || typeof level !== "string" || !level) continue;
+		entries.push({
 			session_id: sessionId,
-			gradio_version: typeof msg.gradio_version === "string" ? msg.gradio_version : "",
-			dropped: count(msg.dropped),
-		};
+			seq,
+			ts: typeof ts === "number" && Number.isFinite(ts) ? ts : Date.now(),
+			level: level.slice(0, 32),
+			text: clip(text),
+			...(typeof stack === "string" && stack ? { stack: clip(stack) } : {}),
+		});
 	}
-	if (msg.type === "entries") {
-		if (!Array.isArray(msg.entries)) return null;
-		const entries: ConsoleEntry[] = [];
-		for (const raw of msg.entries) {
-			if (!raw || typeof raw !== "object") continue;
-			const { seq, ts, level, text, stack } = raw as Record<string, unknown>;
-			if (typeof seq !== "number" || !Number.isInteger(seq) || seq < 1) continue;
-			if (typeof text !== "string" || typeof level !== "string" || !level) continue;
-			entries.push({
-				session_id: sessionId,
-				seq,
-				ts: typeof ts === "number" && Number.isFinite(ts) ? ts : Date.now(),
-				level: level.slice(0, 32),
-				text: clip(text),
-				...(typeof stack === "string" && stack ? { stack: clip(stack) } : {}),
-			});
-		}
-		return { type: "entries", session_id: sessionId, entries, dropped: count(msg.dropped) };
-	}
-	return null;
+	return {
+		...(typeof msg.id === "string" || typeof msg.id === "number" ? { id: msg.id } : {}),
+		session_id: sessionId,
+		gradio_version: typeof msg.gradio_version === "string" ? msg.gradio_version : "",
+		dropped: count(msg.dropped),
+		entries,
+	};
 }
 
 export interface ConsoleReceiverOptions {
@@ -71,35 +70,45 @@ export interface ConsoleReceiverOptions {
 	frame: () => MessageEventSource | null | undefined;
 	/** the frame exact origin */
 	origin: string;
-	onState: (state: FrameConsoleState, ack?: { session_id: string; gradio_version: string }) => void;
-	/** new entries only, a session_id and seq already delivered is dropped */
-	onEntries: (entries: ConsoleEntry[], dropped: number) => void;
+	onState: (
+		state: FrameConsoleState,
+		reply?: { session_id: string; gradio_version: string }
+	) => void;
+	/** every state reply, with only the entries not delivered before */
+	onSnapshot: (snapshot: ConsoleState) => void;
 }
 
 export interface ConsoleReceiver {
-	/** call on every iframe load, a reload restarts the handshake */
-	load(): void;
+	/** call on every iframe load, a reload restarts the sequence */
+	load(id?: string): void;
+	/** a fresh get at any time, a reply to it upgrades an unsupported frame */
+	request(id: string): void;
 	handleMessage(event: MessageEvent): void;
 	dispose(): void;
 }
 
 export function createConsoleReceiver(options: ConsoleReceiverOptions): ConsoleReceiver {
-	const { frame, origin, onState, onEntries } = options;
+	const { frame, origin, onState, onSnapshot } = options;
 	const seen = new Map<string, Set<number>>();
 	let timers: ReturnType<typeof setTimeout>[] = [];
-	let acked = false;
-	let ackedSession: string | undefined;
+	let answered = false;
+	let session: string | undefined;
 
 	const clearTimers = () => {
 		for (const timer of timers) clearTimeout(timer);
 		timers = [];
 	};
 
-	const sendInit = () => {
+	const sendGet = (id?: string) => {
 		const target = frame() as Window | null | undefined;
 		try {
 			target?.postMessage(
-				{ protocol: GRADIO_CONSOLE_PROTOCOL, version: GRADIO_CONSOLE_VERSION, type: "init" },
+				{
+					protocol: GRADIO_CONSOLE_PROTOCOL,
+					version: GRADIO_CONSOLE_VERSION,
+					type: "get",
+					...(id !== undefined ? { id } : {}),
+				},
 				origin
 			);
 		} catch {
@@ -108,48 +117,51 @@ export function createConsoleReceiver(options: ConsoleReceiverOptions): ConsoleR
 	};
 
 	return {
-		load() {
+		load(id) {
 			clearTimers();
-			acked = false;
-			ackedSession = undefined;
+			answered = false;
+			session = undefined;
 			onState("connecting");
-			sendInit();
-			for (const delay of INIT_RETRY_MS) {
-				timers.push(setTimeout(() => !acked && sendInit(), delay));
+			sendGet(id);
+			for (const delay of GET_RETRY_MS) {
+				timers.push(setTimeout(() => !answered && sendGet(id), delay));
 			}
 			timers.push(
 				setTimeout(() => {
-					if (!acked) onState("unsupported");
+					if (!answered) onState("unsupported");
 				}, UNSUPPORTED_AFTER_MS)
 			);
+		},
+
+		request(id) {
+			sendGet(id);
 		},
 
 		handleMessage(event) {
 			const source = frame();
 			if (!source || event.source !== source || event.origin !== origin) return;
-			const message = parseConsoleMessage(event.data);
-			if (!message) return;
-			if (message.type === "ack") {
-				acked = true;
-				clearTimers();
-				if (message.session_id !== ackedSession) {
-					ackedSession = message.session_id;
-					onState("connected", {
-						session_id: message.session_id,
-						gradio_version: message.gradio_version,
-					});
-				}
-				if (message.dropped) onEntries([], message.dropped);
-				return;
+			const state = parseConsoleState(event.data);
+			if (!state) return;
+			answered = true;
+			clearTimers();
+			if (state.session_id !== session) {
+				session = state.session_id;
+				onState("connected", {
+					session_id: state.session_id,
+					gradio_version: state.gradio_version,
+				});
 			}
-			let session = seen.get(message.session_id);
-			if (!session) seen.set(message.session_id, (session = new Set()));
-			const fresh = message.entries.filter((entry) => {
-				if (session.has(entry.seq)) return false;
-				session.add(entry.seq);
-				return true;
+			let seqs = seen.get(state.session_id);
+			if (!seqs) seen.set(state.session_id, (seqs = new Set()));
+			const known = seqs;
+			onSnapshot({
+				...state,
+				entries: state.entries.filter((entry) => {
+					if (known.has(entry.seq)) return false;
+					known.add(entry.seq);
+					return true;
+				}),
 			});
-			if (fresh.length || message.dropped) onEntries(fresh, message.dropped);
 		},
 
 		dispose() {

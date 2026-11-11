@@ -78,20 +78,29 @@ describe.sequential("POST /conversation/[id]/space-console", () => {
 		expect(
 			(await send(id, locals, { space: SPACE, load: "l1", check: "c1", state: "loading" })).status
 		).toBe(200);
-		const res = await send(id, locals, {
+		await send(id, locals, {
 			space: SPACE,
 			load: "l1",
 			state: "connected",
 			session_id: "s1",
 			gradio_version: "6.31.0",
+		});
+		const res = await send(id, locals, {
+			space: SPACE,
+			load: "l1",
+			session_id: "s1",
+			gradio_version: "6.31.0",
 			entries: [entry(1), entry(2, { stack: "TypeError\n at f" })],
 			dropped: 7,
+			answers: "c1",
 		});
-		expect(await res.json()).toEqual({ stored: 2, dropped: 0 });
+		expect(await res.json()).toEqual({ stored: 2, rejected: 0 });
 
 		expect(await readFrame(conv._id, SPACE)).toMatchObject({
 			loadId: "l1",
+			loadedFor: "c1",
 			checkId: "c1",
+			answeredCheck: "c1",
 			state: "connected",
 			sessionId: "s1",
 			gradioVersion: "6.31.0",
@@ -150,7 +159,7 @@ describe.sequential("POST /conversation/[id]/space-console", () => {
 				entry(3),
 			],
 		});
-		expect(await res.json()).toEqual({ stored: 2, dropped: 3 });
+		expect(await res.json()).toEqual({ stored: 2, rejected: 3 });
 		const stored = await readConsoleEntries(conv._id, SPACE);
 		expect(stored.map((e) => e.seq)).toEqual([1, 3]);
 		expect(stored[0].text).toHaveLength(4096);

@@ -26,13 +26,17 @@ export interface SpaceConsoleFrame {
 	spaceId: string;
 	/** one per frame load, so a late message from an earlier load cannot overwrite this one */
 	loadId: string;
-	/** the check_space call whose update loaded the frame */
+	/** the check_space call this load was opened for */
+	loadedFor?: string;
+	/** the latest check_space call this load was asked to answer */
 	checkId?: string;
+	/** the check_space call the latest snapshot answered */
+	answeredCheck?: string;
 	state: SpaceFrameState;
-	/** the page load that acked */
+	/** the page load that answered */
 	sessionId?: string;
 	gradioVersion?: string;
-	/** entries the frame evicted unsent during this load */
+	/** total the frame evicted since that page load, as its latest snapshot said */
 	dropped?: number;
 	updatedAt: Date;
 }

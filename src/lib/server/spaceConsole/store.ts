@@ -67,27 +67,31 @@ export async function recordConsoleEntries(
 	return inserted;
 }
 
-export async function recordFrameState(params: {
+export async function recordFrame(params: {
 	conversationId: ObjectId;
 	spaceId: string;
 	loadId: string;
-	state: SpaceFrameState;
+	state?: SpaceFrameState;
 	checkId?: string;
+	answeredCheck?: string;
 	sessionId?: string;
 	gradioVersion?: string;
+	dropped?: number;
 }): Promise<void> {
-	const { conversationId, spaceId, loadId, state, checkId, sessionId, gradioVersion } = params;
+	const { conversationId, spaceId, loadId, state, checkId, answeredCheck } = params;
+	const { sessionId, gradioVersion, dropped } = params;
 	const updatedAt = new Date();
 	if (state === "loading") {
 		await collections.spaceConsoleFrames.updateOne(
 			{ conversationId, spaceId },
 			{
-				$set: { loadId, state, updatedAt, ...(checkId ? { checkId } : {}) },
+				$set: { loadId, state, updatedAt, ...(checkId ? { checkId, loadedFor: checkId } : {}) },
 				$unset: {
 					sessionId: "",
 					gradioVersion: "",
 					dropped: "",
-					...(checkId ? {} : { checkId: "" }),
+					answeredCheck: "",
+					...(checkId ? {} : { checkId: "", loadedFor: "" }),
 				},
 			},
 			{ upsert: true }
@@ -98,24 +102,15 @@ export async function recordFrameState(params: {
 		{ conversationId, spaceId, loadId },
 		{
 			$set: {
-				state,
 				updatedAt,
+				...(state ? { state } : {}),
+				...(checkId ? { checkId } : {}),
+				...(answeredCheck ? { answeredCheck } : {}),
 				...(sessionId ? { sessionId } : {}),
 				...(gradioVersion !== undefined ? { gradioVersion } : {}),
+				...(dropped !== undefined ? { dropped } : {}),
 			},
 		}
-	);
-}
-
-export async function recordFrameDropped(
-	conversationId: ObjectId,
-	spaceId: string,
-	loadId: string,
-	dropped: number
-): Promise<void> {
-	await collections.spaceConsoleFrames.updateOne(
-		{ conversationId, spaceId, loadId },
-		{ $inc: { dropped }, $set: { updatedAt: new Date() } }
 	);
 }
 

@@ -10,8 +10,7 @@ import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import {
 	CONSOLE_TEXT_MAX,
 	recordConsoleEntries,
-	recordFrameDropped,
-	recordFrameState,
+	recordFrame,
 	type IncomingConsoleEntry,
 } from "$lib/server/spaceConsole/store";
 
@@ -52,11 +51,13 @@ const bodySchema = z.object({
 	space: z.string().regex(SPACE_ID).max(200),
 	load: id,
 	check: id.optional(),
+	/** the check this snapshot answers */
+	answers: id.optional(),
 	state: z.enum(["loading", "connected", "unsupported"]).optional(),
 	session_id: id.optional(),
 	gradio_version: z.string().max(100).optional(),
-	/** entries the frame evicted before it could send them */
-	dropped: z.number().int().min(0).max(1_000_000).default(0),
+	/** total the frame evicted since its page load */
+	dropped: z.number().int().min(0).max(1_000_000).optional(),
 	entries: z.array(z.unknown()).max(ENTRIES_MAX).default([]),
 });
 
@@ -109,22 +110,22 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 		});
 	}
 
-	if (body.state) {
-		await recordFrameState({
+	// entries first, so a check that sees its answer finds them stored
+	const stored = await recordConsoleEntries(conversationId, body.space, entries);
+	if (body.state || body.check || body.answers || body.session_id) {
+		await recordFrame({
 			conversationId,
 			spaceId: body.space,
 			loadId: body.load,
 			state: body.state,
 			checkId: body.check,
+			answeredCheck: body.answers,
 			sessionId: body.session_id,
 			gradioVersion: body.gradio_version,
+			dropped: body.dropped,
 		});
 	}
-	if (body.dropped) {
-		await recordFrameDropped(conversationId, body.space, body.load, body.dropped);
-	}
-	const stored = await recordConsoleEntries(conversationId, body.space, entries);
-	return json({ stored, dropped: body.entries.length - entries.length });
+	return json({ stored, rejected: body.entries.length - entries.length });
 };
 
 /** the __sign token a private space frame needs, null when public or when the hub refuses */

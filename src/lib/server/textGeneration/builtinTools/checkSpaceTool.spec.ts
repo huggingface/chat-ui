@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { ObjectId } from "mongodb";
 import { ready } from "$lib/server/database";
 import { readSpaceLogTail } from "$lib/server/hubSpaces";
-import { recordConsoleEntries, recordFrameState } from "$lib/server/spaceConsole/store";
+import { recordConsoleEntries, recordFrame } from "$lib/server/spaceConsole/store";
 import type { MessageUpdate } from "$lib/types/MessageUpdate";
 import { createCheckSpaceTool } from "./checkSpaceTool";
 import type { BuiltinToolContext } from "./types";
@@ -270,7 +270,7 @@ describe("readSpaceLogTail", () => {
 });
 
 describe("check_space console section", () => {
-	const FAST = { attachMs: 300, handshakeMs: 300, settleMs: 30, pollMs: 20 };
+	const FAST = { attachMs: 300, answerMs: 300, pollMs: 20 };
 
 	beforeAll(async () => {
 		await ready;
@@ -320,13 +320,9 @@ describe("check_space console section", () => {
 	it("returns what the tab's frame forwarded for this check", async () => {
 		const { liveCtx, conversationId } = live();
 		const base = { conversationId, spaceId: "pngwn/demo", loadId: "l1" };
-		await recordFrameState({ ...base, checkId: liveCtx.uuid, state: "loading" });
-		await recordFrameState({
-			...base,
-			state: "connected",
-			sessionId: "s1",
-			gradioVersion: "6.31.0",
-		});
+		await recordFrame({ ...base, checkId: liveCtx.uuid, state: "loading" });
+		await recordFrame({ ...base, state: "connected", sessionId: "s1", gradioVersion: "6.31.0" });
+		await recordFrame({ ...base, answeredCheck: liveCtx.uuid, sessionId: "s1" });
 		await recordConsoleEntries(conversationId, "pngwn/demo", [
 			{ sessionId: "s1", seq: 1, ts: 1, level: "error", text: "Failed to load module script" },
 		]);

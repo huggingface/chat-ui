@@ -7,8 +7,7 @@ import {
 	readConsoleEntries,
 	readFrame,
 	recordConsoleEntries,
-	recordFrameDropped,
-	recordFrameState,
+	recordFrame,
 	type IncomingConsoleEntry,
 } from "./store";
 import { consoleSection, formatConsole, type ConsoleWaits } from "./section";
@@ -51,7 +50,7 @@ describe("space console store", () => {
 	it("reads past rows the TTL monitor has not swept yet as gone", async () => {
 		const conversationId = new ObjectId();
 		await recordConsoleEntries(conversationId, SPACE, [entry(1), entry(2)]);
-		await recordFrameState({ conversationId, spaceId: SPACE, loadId: "l", state: "loading" });
+		await recordFrame({ conversationId, spaceId: SPACE, loadId: "l", state: "loading" });
 		await collections.spaceConsoleEntries.updateOne(
 			{ conversationId, seq: 1 },
 			{ $set: { createdAt: new Date(Date.now() - 31 * 60_000) } }
@@ -99,16 +98,16 @@ describe("space console store", () => {
 	it("starts a frame over on load and ignores a late update from the load before", async () => {
 		const conversationId = new ObjectId();
 		const base = { conversationId, spaceId: SPACE };
-		await recordFrameState({ ...base, loadId: "l1", checkId: "c1", state: "loading" });
-		await recordFrameState({
+		await recordFrame({ ...base, loadId: "l1", checkId: "c1", state: "loading" });
+		await recordFrame({
 			...base,
 			loadId: "l1",
 			state: "connected",
 			sessionId: "s1",
 			gradioVersion: "6.31.0",
 		});
-		await recordFrameState({ ...base, loadId: "l2", checkId: "c2", state: "loading" });
-		await recordFrameState({ ...base, loadId: "l1", state: "unsupported" });
+		await recordFrame({ ...base, loadId: "l2", checkId: "c2", state: "loading" });
+		await recordFrame({ ...base, loadId: "l1", state: "unsupported" });
 		expect(await readFrame(conversationId, SPACE)).toMatchObject({
 			loadId: "l2",
 			checkId: "c2",
@@ -120,7 +119,7 @@ describe("space console store", () => {
 	});
 });
 
-const FAST: ConsoleWaits = { attachMs: 300, handshakeMs: 300, settleMs: 50, pollMs: 20 };
+const FAST: ConsoleWaits = { attachMs: 300, answerMs: 300, pollMs: 20 };
 
 describe("console section", () => {
 	it("says in one line when no tab opened the Space", async () => {
@@ -137,14 +136,14 @@ describe("console section", () => {
 
 	it("does not count a tab that loaded the Space for an earlier check", async () => {
 		const conversationId = new ObjectId();
-		await recordFrameState({
+		await recordFrame({
 			conversationId,
 			spaceId: SPACE,
 			loadId: "l1",
 			checkId: "c0",
 			state: "loading",
 		});
-		await recordFrameState({ conversationId, spaceId: SPACE, loadId: "l1", state: "connected" });
+		await recordFrame({ conversationId, spaceId: SPACE, loadId: "l1", state: "connected" });
 		const lines = await consoleSection({
 			conversationId,
 			spaceId: SPACE,
@@ -154,26 +153,15 @@ describe("console section", () => {
 		expect(lines[0]).toContain("no browser tab");
 	});
 
-	it("waits for the tab, the ack and the page-load entries", async () => {
+	it("waits for the tab to be asked, then for the reply to this check", async () => {
 		const conversationId = new ObjectId();
+		const base = { conversationId, spaceId: SPACE, loadId: "l1" };
+		await recordFrame({ ...base, state: "loading" });
+		await recordFrame({ ...base, state: "connected", sessionId: "s1", gradioVersion: "6.31.0" });
 		const reading = consoleSection({ conversationId, spaceId: SPACE, checkId: "c1", waits: FAST });
 		await new Promise((r) => setTimeout(r, 60));
-		await recordFrameState({
-			conversationId,
-			spaceId: SPACE,
-			loadId: "l1",
-			checkId: "c1",
-			state: "loading",
-		});
+		await recordFrame({ ...base, checkId: "c1" });
 		await new Promise((r) => setTimeout(r, 60));
-		await recordFrameState({
-			conversationId,
-			spaceId: SPACE,
-			loadId: "l1",
-			state: "connected",
-			sessionId: "s1",
-			gradioVersion: "6.31.0",
-		});
 		await recordConsoleEntries(conversationId, SPACE, [
 			{
 				...entry(1, "s1", "Uncaught TypeError: x is undefined"),
@@ -181,6 +169,7 @@ describe("console section", () => {
 				stack: "TypeError: x is undefined\n    at App (index.js:3:9)",
 			},
 		]);
+		await recordFrame({ ...base, answeredCheck: "c1", sessionId: "s1", dropped: 0 });
 		expect(await reading).toEqual([
 			"Console (browser tab, Gradio 6.31.0): 1 entry, oldest first:",
 			"  [exception] Uncaught TypeError: x is undefined",
@@ -189,18 +178,33 @@ describe("console section", () => {
 		]);
 	});
 
-	it("reports a frame that never acked", async () => {
+	it("stops early when a load opened for this check got no answer", async () => {
 		const conversationId = new ObjectId();
 		const base = { conversationId, spaceId: SPACE, loadId: "l1" };
-		await recordFrameState({ ...base, checkId: "c1", state: "loading" });
-		await recordFrameState({ ...base, state: "unsupported" });
+		await recordFrame({ ...base, checkId: "c1", state: "loading" });
+		await recordFrame({ ...base, state: "unsupported" });
+		const started = Date.now();
 		const lines = await consoleSection({
 			conversationId,
 			spaceId: SPACE,
 			checkId: "c1",
-			waits: FAST,
+			waits: { ...FAST, answerMs: 5000 },
 		});
-		expect(lines[0]).toContain("does not forward its console");
+		expect(Date.now() - started).toBeLessThan(2000);
+		expect(lines[0]).toContain("does not answer for its console");
+	});
+
+	it("waits out a frame that was unsupported before this check, which may answer late", async () => {
+		const conversationId = new ObjectId();
+		const base = { conversationId, spaceId: SPACE, loadId: "l1" };
+		await recordFrame({ ...base, checkId: "c0", state: "loading" });
+		await recordFrame({ ...base, state: "unsupported" });
+		await recordFrame({ ...base, checkId: "c1" });
+		const reading = consoleSection({ conversationId, spaceId: SPACE, checkId: "c1", waits: FAST });
+		await new Promise((r) => setTimeout(r, 100));
+		await recordFrame({ ...base, state: "connected", sessionId: "s1" });
+		await recordFrame({ ...base, answeredCheck: "c1", sessionId: "s1" });
+		expect(await reading).toEqual(["Console (browser tab): nothing logged since the page loaded."]);
 	});
 
 	it("tags page loads and cuts the middle of a long console", () => {
@@ -219,22 +223,22 @@ describe("console section", () => {
 		expect(out[0]).toBe("Console (browser tab): 55 entries, oldest first, from 2 page loads:");
 		expect(out[1]).toBe("page load 1:");
 		expect(out).toContain("  …[15 entries omitted]…");
-		expect(out).toContain("page load 2 (the one this check opened):");
+		expect(out).toContain("page load 2 (the page open now):");
 		expect(out.at(-1)).toBe("  [log] entry 50");
 	});
 
-	it("counts what the frame dropped for the current load and starts over on reload", async () => {
+	it("keeps the latest dropped total for the page load and starts over on reload", async () => {
 		const conversationId = new ObjectId();
 		const base = { conversationId, spaceId: SPACE };
-		await recordFrameState({ ...base, loadId: "l1", checkId: "c1", state: "loading" });
-		await recordFrameDropped(conversationId, SPACE, "l1", 20);
-		await recordFrameDropped(conversationId, SPACE, "l1", 5);
-		await recordFrameDropped(conversationId, SPACE, "l0", 99);
+		await recordFrame({ ...base, loadId: "l1", checkId: "c1", state: "loading" });
+		await recordFrame({ ...base, loadId: "l1", sessionId: "s1", dropped: 20 });
+		await recordFrame({ ...base, loadId: "l1", sessionId: "s1", dropped: 25 });
+		await recordFrame({ ...base, loadId: "l0", sessionId: "s0", dropped: 99 });
 		expect((await readFrame(conversationId, SPACE))?.dropped).toBe(25);
-		await recordFrameState({ ...base, loadId: "l2", checkId: "c2", state: "loading" });
+		await recordFrame({ ...base, loadId: "l2", checkId: "c2", state: "loading" });
 		expect((await readFrame(conversationId, SPACE))?.dropped).toBeUndefined();
 		expect(formatConsole([], "s", "", 25).at(-1)).toBe(
-			"The frame dropped 25 entries before forwarding them: it keeps 100 and sends at most 20 batches a second."
+			"The page dropped 25 older entries: it keeps the last 100."
 		);
 	});
 
@@ -250,7 +254,7 @@ describe("console section", () => {
 			"Console (browser tab, Gradio 6.31.0): 1 entry, oldest first:",
 			"page load 1:",
 			"  [log] entry 1",
-			"The page load this check opened has logged nothing.",
+			"The page open now has logged nothing.",
 		]);
 		expect(formatConsole([], "new", "6.31.0")).toEqual([
 			"Console (browser tab, Gradio 6.31.0): nothing logged since the page loaded.",

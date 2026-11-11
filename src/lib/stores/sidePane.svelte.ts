@@ -12,7 +12,7 @@ export const SIDE_PANE_DEFAULT_FRACTION = "60%";
 /** Which view owns the pane. One slot, so the views are mutually exclusive. */
 export type SidePaneView = "artifact" | "trackio" | "workflow" | "registry" | "review" | "space";
 
-/** a space check_space opened, a new checkId reloads its frame */
+/** a space check_space opened, a new checkId asks its frame for the console again */
 export interface SidePaneSpace {
 	url: string;
 	label: string;
@@ -144,7 +144,7 @@ class SidePaneStore {
 		this.revealNonce += 1;
 	}
 
-	/** opens a checked space once so closing it sticks, a later check of the space showing reloads it */
+	/** opens a checked space once so closing it sticks, a later check of the space showing asks it again */
 	followSpaceCheck(space: SidePaneSpace) {
 		if (this.open && this.view === "space" && this.space?.url === space.url) {
 			if (this.space.checkId !== space.checkId) this.space = { ...space };

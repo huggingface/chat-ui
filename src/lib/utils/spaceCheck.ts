@@ -27,7 +27,7 @@ export interface SpaceCheck {
 	url: string;
 	label: string;
 	private: boolean;
-	/** the check_space update uuid, a new one reloads the frame */
+	/** the check_space update uuid, a new one asks the frame for the console again */
 	checkId: string;
 	messageId?: Message["id"];
 }
