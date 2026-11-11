@@ -9,6 +9,7 @@ import { createWaitTool } from "./waitTool";
 import { createResearchTool } from "./researchTool";
 import { createSandboxTool } from "./sandboxTool";
 import { createJobCheckTool } from "./jobCheckTool";
+import { createCheckSpaceTool } from "./checkSpaceTool";
 import { createTrackioTool } from "./createTrackioTool";
 import { createReadTrackioTool } from "./readTrackioTool";
 import { createWorkflowTool, workflowsEnabled } from "./createWorkflowTool";
@@ -22,6 +23,7 @@ export { PLAN_TOOL_NAME } from "./planTool";
 export { RESEARCH_TOOL_NAME, isResearchTool } from "./researchTool";
 export { SANDBOX_TOOL_NAME, isSandboxTool } from "./sandboxTool";
 export { JOB_CHECK_TOOL_NAME, isJobCheckTool } from "./jobCheckTool";
+export { CHECK_SPACE_TOOL_NAME } from "./checkSpaceTool";
 export { CREATE_TRACKIO_TOOL_NAME } from "./createTrackioTool";
 export { READ_TRACKIO_TOOL_NAME } from "./readTrackioTool";
 export { CREATE_WORKFLOW_TOOL_NAME } from "./createWorkflowTool";
@@ -60,6 +62,7 @@ export function getEnabledBuiltinTools(params: {
 		createResearchTool(),
 		createSandboxTool({ virtualFiles }),
 		createJobCheckTool({ virtualFiles }),
+		createCheckSpaceTool(() => params.hfToken),
 		createTrackioTool(() => params.namespace),
 		createReadTrackioTool(
 			() => params.conv.messages ?? [],
