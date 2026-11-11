@@ -100,7 +100,7 @@ describe("fetchZeroGpuHeaders", () => {
 describe("workflowTokenHandler", () => {
 	const ORIGIN = "https://hmb-wf.hf.space";
 	let frame: { postMessage: ReturnType<typeof vi.fn> };
-	let consent: ReturnType<typeof vi.fn<() => boolean>>;
+	let consent: ReturnType<typeof vi.fn<(ask: boolean) => boolean>>;
 	const fetch = vi.fn(async (url: string) =>
 		url.includes("jwt-inference-only")
 			? Response.json({ accessToken: "hf_jwt_x", exp: Date.now() / 1000 + 600 })
@@ -123,7 +123,7 @@ describe("workflowTokenHandler", () => {
 
 	beforeEach(() => {
 		frame = { postMessage: vi.fn() };
-		consent = vi.fn(() => true);
+		consent = vi.fn((ask: boolean) => ask);
 		fetch.mockClear();
 		vi.stubGlobal("fetch", fetch);
 	});
@@ -170,6 +170,21 @@ describe("workflowTokenHandler", () => {
 
 		expect(fetch).toHaveBeenCalledTimes(1);
 		expect(frame.postMessage).toHaveBeenCalledWith(...tokenReply(null));
+	});
+
+	it("answers a probe without asking, for the viewer's own Space or one they allowed", async () => {
+		const probe = () => message({ type: "INFERENCE_JWT_PROBE" });
+		const other = handler("mallory/wf");
+		await handler()(probe());
+		await other(probe());
+		expect(consent).not.toHaveBeenCalledWith(true);
+
+		// storage blocked, so only this visit's yes counts
+		await other(tokenRequest());
+		await other(probe());
+
+		const replies = frame.postMessage.mock.calls.map(([data]) => data.token);
+		expect(replies).toEqual(["hf_jwt_x", null, "hf_jwt_x", "hf_jwt_x"]);
 	});
 
 	it("replies with no token when the viewer says no", async () => {
