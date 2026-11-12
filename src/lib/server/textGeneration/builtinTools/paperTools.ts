@@ -13,6 +13,7 @@ import { findStoredPaper, loadPaperPages, savePaper } from "$lib/server/papers/s
 import {
 	formatPaperMarker,
 	isPaperId,
+	normalizePaperId,
 	OPEN_PAPER_TOOL_NAME,
 	READ_PAPER_TOOL_NAME,
 	type PaperRef,
@@ -152,6 +153,7 @@ export function createOpenPaperTool(): BuiltinTool {
 				(source.kind === "arxiv"
 					? await hubPaperTitle(source.arxivId, ctx.abortSignal)
 					: undefined) ??
+				extracted.displayTitle ??
 				extracted.title ??
 				firstLine(extracted) ??
 				id;
@@ -214,7 +216,7 @@ export function createReadPaperTool(): BuiltinTool {
 		definition: readDefinition,
 		async execute(args: Record<string, unknown>, ctx: BuiltinToolContext) {
 			if (!ctx.conversationId) return { error: "The paper reader needs a conversation." };
-			const id = typeof args.paper === "string" ? args.paper.trim().replace(/^arxiv:/i, "") : "";
+			const id = typeof args.paper === "string" ? normalizePaperId(args.paper) : "";
 			if (!isPaperId(id)) return { error: "Pass the paper id open_paper returned." };
 			const paper = await findStoredPaper(ctx.conversationId, id);
 			if (!paper) {

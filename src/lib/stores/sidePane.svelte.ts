@@ -331,23 +331,35 @@ class SidePaneStore {
 	 * Open a paper, optionally at a page and passage. Without a target an open
 	 * tab keeps its own scroll position, so reopening a paper resumes reading.
 	 */
-	openPaper(paperId: string, label: string, target?: { page: number; quote?: string }) {
+	openPaper(
+		paperId: string,
+		label: string,
+		target?: { page: number; quote?: string },
+		{ focus = true }: { focus?: boolean } = {}
+	) {
 		const existing = this.tabs.find((t) => t.id === `paper:${paperId}`);
 		const previous = existing?.kind === "paper" ? existing.target : null;
-		this.openTab({
-			kind: "paper",
-			paperId,
-			label,
-			target: target ? { ...target, nonce: (previous?.nonce ?? 0) + 1 } : previous,
-		});
+		this.openTab(
+			{
+				kind: "paper",
+				paperId,
+				label,
+				target: target ? { ...target, nonce: (previous?.nonce ?? 0) + 1 } : previous,
+			},
+			{ focus }
+		);
 	}
 
-	/** Open a paper the first time it appears; a closed tab stays closed. */
+	/**
+	 * Open a paper the first time it appears; a closed tab stays closed. Like a
+	 * workflow, it never takes over another view: with one showing, the paper
+	 * opens as a background tab.
+	 */
 	maybeAutoOpenPaper(paperId: string, label: string) {
 		const key = `paper:${paperId}`;
 		if (this.autoOpenedKeys.has(key)) return;
 		this.autoOpenedKeys.add(key);
-		this.openPaper(paperId, label);
+		this.openPaper(paperId, label, undefined, { focus: !(this.open && this.view !== "paper") });
 	}
 
 	selectTab(tab: "preview" | "code") {

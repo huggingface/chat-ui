@@ -13,7 +13,10 @@ export interface PdfOutlineEntry {
 
 export interface ExtractedPdf {
 	pages: string[];
+	/** the document's metadata title */
 	title?: string;
+	/** the largest type on page 1, which on a paper is its title */
+	displayTitle?: string;
 	outline: PdfOutlineEntry[];
 }
 
@@ -103,6 +106,7 @@ export async function extractPdf(
 			);
 		}
 		const pages: string[] = [];
+		let displayTitle: string | undefined;
 		let total = 0;
 		for (let n = 1; n <= doc.numPages; n++) {
 			await checkpoint();
@@ -115,6 +119,7 @@ export async function extractPdf(
 				text += item.hasEOL ? "\n" : "";
 				if (text.length >= MAX_PAGE_CHARS) break;
 			}
+			if (n === 1) displayTitle = largestLine(content.items);
 			text = text
 				.slice(0, MAX_PAGE_CHARS)
 				.replace(/[ \t]+\n/g, "\n")
@@ -147,10 +152,65 @@ export async function extractPdf(
 		};
 		await walk(items, 0);
 
-		return { pages, ...(title ? { title } : {}), outline };
+		return {
+			pages,
+			...(title ? { title } : {}),
+			...(displayTitle ? { displayTitle } : {}),
+			outline,
+		};
 	} finally {
 		await task.destroy();
 	}
+}
+
+interface LaidOutText {
+	str: string;
+	hasEOL: boolean;
+	height: number;
+	transform: number[];
+}
+
+/**
+ * The line set in the largest type on a page, joined with the lines after it
+ * in the same size (a title often wraps). Running headers ("Journal of …,
+ * Submitted 11/13") sit above the title in smaller type, which is why the
+ * first line is a poor name. Rotated text is skipped: arXiv stamps its id up
+ * the margin in larger type than most titles. Undefined when nothing stands
+ * out from the body text.
+ */
+export function largestLine(items: ReadonlyArray<object>): string | undefined {
+	const lines: Array<{ text: string; size: number }> = [];
+	let current = { text: "", size: 0 };
+	for (const raw of items) {
+		if (!("str" in raw)) continue;
+		const item = raw as LaidOutText;
+		const [, b, c] = item.transform;
+		if (b === 0 && c === 0 && item.str.trim()) {
+			current.text += item.str;
+			current.size = Math.max(current.size, item.height);
+		} else if (item.str === " " || item.str === "") {
+			current.text += item.str;
+		}
+		if (item.hasEOL) {
+			lines.push(current);
+			current = { text: "", size: 0 };
+		}
+	}
+	lines.push(current);
+	const real = lines.filter((l) => l.size > 0 && /\p{L}{2}/u.test(l.text));
+	if (real.length < 2) return undefined;
+	const sizes = real.map((l) => l.size).sort((x, y) => x - y);
+	const median = sizes[Math.floor(sizes.length / 2)];
+	const largest = sizes[sizes.length - 1];
+	if (largest < median * 1.15) return undefined;
+	const first = real.findIndex((l) => l.size >= largest * 0.97);
+	const parts: string[] = [];
+	for (const line of real.slice(first, first + 3)) {
+		if (line.size < largest * 0.97) break;
+		parts.push(line.text);
+	}
+	const title = cleanDocumentText(parts.join(" "), 300);
+	return title.length >= 8 ? title : undefined;
 }
 
 type Doc = Awaited<ReturnType<PdfJs["getDocument"]>["promise"]>;

@@ -85,6 +85,18 @@ describe("sidePane tabs", () => {
 		expect(sidePane.hasTab("workflow:https://w.hf.space")).toBe(true);
 	});
 
+	it("auto-opens a paper in the background when something else is showing", () => {
+		sidePane.openTrackio("https://a.hf.space", "a");
+		sidePane.maybeAutoOpenPaper("1706.03762", "Attention");
+		expect(sidePane.view).toBe("trackio");
+		expect(sidePane.tabs.map((t) => t.id)).toContain("paper:1706.03762");
+
+		// with only papers showing, a new one comes to the front
+		sidePane.activate("paper:1706.03762");
+		sidePane.maybeAutoOpenPaper("1810.04805", "BERT");
+		expect(sidePane.active?.id).toBe("paper:1810.04805");
+	});
+
 	it("bumps a paper target so the same passage can be flashed twice", () => {
 		sidePane.openPaper("1706.03762", "Attention", { page: 3, quote: "x" });
 		const first = sidePane.active?.kind === "paper" ? sidePane.active.target?.nonce : undefined;

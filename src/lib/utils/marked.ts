@@ -389,6 +389,9 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 						title ? ` data-quote="${escapeHTML(title)}" title="${escapeHTML(title)}"` : ""
 					}>${text}</a>`;
 				}
+				// Any other `paper:` link names nothing the reader can open; never
+				// hand it on as a URL.
+				if (href && /^\s*paper:/i.test(href)) return `<span>${text}</span>`;
 				const safeHref = sanitizeHref(href);
 				return safeHref
 					? `<a href="${escapeHTML(safeHref)}" target="_blank" rel="noreferrer">${text}</a>`

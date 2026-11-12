@@ -415,4 +415,4 @@ export function withPaperQuoteContext(content: string, quotes: PaperQuote[]): st
 	return `${text}${text ? "\n\n" : ""}${blocks}\n\n${PAPER_QUOTE_CONTEXT_NOTE}`;
 }
 
-export { parsePaperHref, paperHref } from "./paperHref";
+export { normalizePaperId, parsePaperHref, paperHref } from "./paperHref";

@@ -558,11 +558,15 @@
 		untrack(() => sidePane.maybeAutoOpenWorkflow(latest));
 	});
 
-	// A paper the agent just opened comes up beside the chat, once: closing its
-	// tab sticks. Desktop only, like the dashboards above.
+	// A paper the agent opens in the answer being written comes up beside the
+	// chat, once: closing its tab sticks. Only that answer's papers count, so
+	// sending anything after a reload does not reopen an older one. Desktop
+	// only, like the dashboards above.
 	$effect(() => {
-		const latest = papers.at(-1);
-		if (!latest || !loading) return;
+		if (!loading) return;
+		const streaming = messages.at(-1);
+		const latest = streaming ? collectPapers([streaming]).at(-1) : undefined;
+		if (!latest) return;
 		if (!window.matchMedia("(min-width: 768px)").matches) return;
 		untrack(() => sidePane.maybeAutoOpenPaper(latest.id, latest.title));
 	});

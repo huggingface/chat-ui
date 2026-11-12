@@ -33,7 +33,7 @@
 	import { HubMentionState } from "$lib/utils/hubMention.svelte";
 	import { getCaretCoordinates } from "$lib/utils/caretCoordinates";
 	import { findViewTokens, stripOrphanViewMarks, VIEW_TOKEN_MARK } from "$lib/utils/trackioView";
-	import { findQuoteTokens, stripOrphanQuoteMarks } from "$lib/utils/paper";
+	import { findQuoteTokens, QUOTE_TOKEN_MARK, stripOrphanQuoteMarks } from "$lib/utils/paper";
 	import {
 		findMentionTokens,
 		MENTION_MARK,
@@ -379,7 +379,11 @@
 	function handleInput(event: Event) {
 		const target = event.currentTarget as HTMLTextAreaElement;
 		if (disabled) return;
-		if (target.value.includes(VIEW_TOKEN_MARK) || target.value.includes(MENTION_MARK)) {
+		if (
+			target.value.includes(VIEW_TOKEN_MARK) ||
+			target.value.includes(MENTION_MARK) ||
+			target.value.includes(QUOTE_TOKEN_MARK)
+		) {
 			const cleaned = stripOrphanMentionMarks(
 				stripOrphanQuoteMarks(stripOrphanViewMarks(target.value))
 			);

@@ -209,9 +209,23 @@ describe("parsePaperHref", () => {
 		});
 	});
 
+	it("points a page-less link at page 1", () => {
+		expect(parsePaperHref("paper:1706.03762")).toEqual({ paperId: "1706.03762", page: 1 });
+	});
+
+	it("reads an id the way the paper prints it", () => {
+		expect(parsePaperHref("paper:1706.03762v7#p3")).toEqual({ paperId: "1706.03762", page: 3 });
+		expect(parsePaperHref("paper:arxiv:1706.03762#p3")).toEqual({
+			paperId: "1706.03762",
+			page: 3,
+		});
+		expect(parsePaperHref("paper:hep-th/9901001v2#p1")?.paperId).toBe("hep-th/9901001");
+		expect(parsePaperHref("paper:pdf-0123456789#p2")?.paperId).toBe("pdf-0123456789");
+	});
+
 	it("rejects anything else", () => {
 		expect(parsePaperHref("https://arxiv.org/abs/1706.03762")).toBeNull();
-		expect(parsePaperHref("paper:1706.03762")).toBeNull();
+		expect(parsePaperHref("paper:a:b#p1")).toBeNull();
 		expect(parsePaperHref("paper:1706.03762#p0")).toBeNull();
 		expect(parsePaperHref("paper:../x#p1")).toBeNull();
 	});

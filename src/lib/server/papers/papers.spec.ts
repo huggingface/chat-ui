@@ -46,9 +46,18 @@ describe("parsePageSpec", () => {
 	});
 });
 
-/** A minimal PDF whose pages each say `text`; `pages` page objects share one content stream. */
-export function tinyPdf(text: string, pages = 1): Uint8Array {
-	const stream = `BT /F1 24 Tf 72 720 Td (${text}) Tj ET`;
+/**
+ * A minimal PDF whose pages each say `text` (or each of `text`'s lines, in its
+ * own type size); `pages` page objects share one content stream.
+ */
+export function tinyPdf(
+	text: string | Array<{ text: string; size: number }>,
+	pages = 1
+): Uint8Array {
+	const lines = typeof text === "string" ? [{ text, size: 24 }] : text;
+	const stream = lines
+		.map((line, i) => `BT /F1 ${line.size} Tf 72 ${720 - i * 40} Td (${line.text}) Tj ET`)
+		.join("\n");
 	const pageIds = Array.from({ length: pages }, (_, i) => i + 5);
 	const objects = [
 		"<< /Type /Catalog /Pages 2 0 R >>",
@@ -78,6 +87,32 @@ describe("extractPdf", () => {
 		const extracted = await extractPdf(tinyPdf("Hello paper reader"));
 		expect(extracted.pages).toEqual(["Hello paper reader"]);
 		expect(extracted.outline).toEqual([]);
+	});
+
+	it("names the document by its largest type, not its running header", async () => {
+		const extracted = await extractPdf(
+			tinyPdf([
+				{ text: "Journal of Machine Learning Research 15 (2014)", size: 9 },
+				{ text: "Dropout: A Simple Way to Prevent", size: 17 },
+				{ text: "Neural Networks from Overfitting", size: 17 },
+				{ text: "Nitish Srivastava", size: 11 },
+				{ text: "Abstract", size: 10 },
+				{ text: "Deep neural nets with a large number of parameters", size: 10 },
+			])
+		);
+		expect(extracted.displayTitle).toBe(
+			"Dropout: A Simple Way to Prevent Neural Networks from Overfitting"
+		);
+	});
+
+	it("names nothing when no line stands out", async () => {
+		const extracted = await extractPdf(
+			tinyPdf([
+				{ text: "First line of a memo", size: 10 },
+				{ text: "Second line of a memo", size: 10 },
+			])
+		);
+		expect(extracted.displayTitle).toBeUndefined();
 	});
 
 	it("refuses a PDF with too many pages before reading any", async () => {

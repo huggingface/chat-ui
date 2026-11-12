@@ -82,9 +82,13 @@ export async function findStoredPaper(
 	conversationId: ConversationKey,
 	paperId: string
 ): Promise<Omit<PaperRef, "messageId"> | null> {
+	// GridFS indexes only `filename, uploadDate`, so the lookup starts from an
+	// anchored filename prefix (an index range scan over this conversation's
+	// paper records) and filters by id within it.
+	const prefix = `${conversationId.toString()}-paper-`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	const file = await collections.bucket
 		.find({
-			"metadata.conversation": conversationId.toString(),
+			filename: { $regex: `^${prefix}` },
 			"metadata.paper.id": paperId,
 		})
 		.sort({ uploadDate: -1 })
