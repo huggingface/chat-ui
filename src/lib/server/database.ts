@@ -25,6 +25,8 @@ import type { MlArtefact } from "$lib/types/MlArtefact";
 import type { MlAgentRun } from "$lib/types/MlAgentRun";
 import type { MlSource } from "$lib/types/MlSource";
 import type { MlSessionLabel } from "$lib/types/MlSessionLabel";
+import type { SpaceConsoleEntry, SpaceConsoleFrame } from "$lib/types/SpaceConsole";
+import { SPACE_CONSOLE_INDEXES } from "$lib/server/spaceConsole/indexes";
 import type { Settings } from "$lib/types/Settings";
 import type { SavedMcpSelection } from "$lib/server/mcp/savedSelection";
 import type { User } from "$lib/types/User";
@@ -184,6 +186,8 @@ export class Database {
 		const mlAgentRuns = db.collection<MlAgentRun>("mlAgentRuns");
 		const mlSources = db.collection<MlSource>("mlSources");
 		const mlSessionLabels = db.collection<MlSessionLabel>("mlSessionLabels");
+		const spaceConsoleEntries = db.collection<SpaceConsoleEntry>("spaceConsoleEntries");
+		const spaceConsoleFrames = db.collection<SpaceConsoleFrame>("spaceConsoleFrames");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
@@ -234,6 +238,8 @@ export class Database {
 			mlAgentRuns,
 			mlSources,
 			mlSessionLabels,
+			spaceConsoleEntries,
+			spaceConsoleFrames,
 			settings,
 			users,
 			sessions,
@@ -277,6 +283,8 @@ export class Database {
 			mlAgentRuns,
 			mlSources,
 			mlSessionLabels,
+			spaceConsoleEntries,
+			spaceConsoleFrames,
 			settings,
 			users,
 			sessions,
@@ -469,6 +477,21 @@ export class Database {
 		mlSessionLabels
 			.createIndex({ reconcileAt: 1 })
 			.catch((e) => logger.error(e, "Error creating index for mlSessionLabels by due time"));
+
+		for (const index of SPACE_CONSOLE_INDEXES.entries) {
+			spaceConsoleEntries
+				.createIndex(index.keys, index.options)
+				.catch((e) =>
+					logger.error(e, `Error creating index for spaceConsoleEntries by ${index.label}`)
+				);
+		}
+		for (const index of SPACE_CONSOLE_INDEXES.frames) {
+			spaceConsoleFrames
+				.createIndex(index.keys, index.options)
+				.catch((e) =>
+					logger.error(e, `Error creating index for spaceConsoleFrames by ${index.label}`)
+				);
+		}
 
 		// One state document per turn; the unique key is what makes the upsert in
 		// turnState.ts race-safe. Ended turns expire like ended generations do.

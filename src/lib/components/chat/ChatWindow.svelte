@@ -5,12 +5,15 @@
 	import ArtifactPanel from "./ArtifactPanel.svelte";
 	import TrackioPane from "./TrackioPane.svelte";
 	import WorkflowPane from "./WorkflowPane.svelte";
+	import SpacePane from "./SpacePane.svelte";
 	import MlRegistryPane from "./MlRegistryPane.svelte";
 	import MlReviewPane from "./MlReviewPane.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
 	import { collectTrackioDashboards } from "$lib/utils/trackio";
 	import { collectWorkflowSpaces } from "$lib/utils/workflowSpace";
+	import { collectSpaceChecks, spaceChecksFromToolUpdates } from "$lib/utils/spaceCheck";
+	import { isMessageToolUpdate } from "$lib/utils/messageUpdates";
 	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
 	import { collectPaneItems } from "$lib/utils/paneItems";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
@@ -216,11 +219,13 @@
 
 	let workflowSpaces = $derived(collectWorkflowSpaces(messages));
 
+	let spaceChecks = $derived(collectSpaceChecks(messages));
+
 	// One ordered list of everything the pane can show, so its next/previous walks
 	// artifacts and dashboards together instead of each view navigating only its
 	// own kind.
 	let paneItems = $derived(
-		collectPaneItems(messages, artifactRegistry, trackioDashboards, workflowSpaces)
+		collectPaneItems(messages, artifactRegistry, trackioDashboards, workflowSpaces, spaceChecks)
 	);
 
 	let shareModalOpen = $state(false);
@@ -543,6 +548,19 @@
 		untrack(() => {
 			if (!sidePane.open || sidePane.view === "workflow") sidePane.maybeAutoOpenWorkflow(latest);
 		});
+	});
+
+	// check_space reads the console of the page this opens, so follow every live check, desktop only
+	$effect(() => {
+		if (!loading || shared) return;
+		const last = messages.at(-1);
+		if (last?.from !== "assistant") return;
+		const latest = spaceChecksFromToolUpdates((last.updates ?? []).filter(isMessageToolUpdate)).at(
+			-1
+		);
+		if (!latest) return;
+		if (!window.matchMedia("(min-width: 768px)").matches) return;
+		untrack(() => sidePane.followSpaceCheck(latest));
 	});
 
 	// Shared conversations containing artifacts usually exist to show one off:
@@ -1625,6 +1643,7 @@
 	/>
 	<TrackioPane items={paneItems} />
 	<WorkflowPane items={paneItems} />
+	<SpacePane items={paneItems} conversationId={shared ? undefined : page.params?.id} />
 	{#if ML_ASSISTANT_MODE}
 		<MlRegistryPane />
 		{#if !shared}

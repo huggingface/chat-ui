@@ -3,6 +3,7 @@ import type { SidePaneView } from "$lib/stores/sidePane.svelte";
 import type { ArtifactRegistry } from "./artifacts";
 import type { TrackioDashboard } from "./trackio";
 import type { WorkflowSpace } from "./workflowSpace";
+import type { SpaceCheck } from "./spaceCheck";
 
 /**
  * Everything the side pane can show for one conversation, as a single ordered
@@ -21,7 +22,8 @@ import type { WorkflowSpace } from "./workflowSpace";
 export type PaneItem =
 	| { kind: "artifact"; identifier: string; label: string }
 	| { kind: "trackio"; url: string; label: string }
-	| { kind: "workflow"; url: string; label: string; spaceId: string };
+	| { kind: "workflow"; url: string; label: string; spaceId: string }
+	| { kind: "space"; url: string; label: string; spaceId: string; private: boolean };
 
 /** The pane's current selection, as the store holds it. */
 export interface PaneSelection {
@@ -29,6 +31,7 @@ export interface PaneSelection {
 	identifier: string | null;
 	trackioUrl?: string;
 	workflowUrl?: string;
+	spaceUrl?: string;
 }
 
 /**
@@ -44,7 +47,8 @@ export function collectPaneItems(
 	messages: Array<Pick<Message, "id">>,
 	registry: ArtifactRegistry,
 	dashboards: TrackioDashboard[],
-	workflows: WorkflowSpace[] = []
+	workflows: WorkflowSpace[] = [],
+	spaces: SpaceCheck[] = []
 ): PaneItem[] {
 	const position = new Map<Message["id"], number>();
 	messages.forEach((message, index) => position.set(message.id, index));
@@ -68,6 +72,14 @@ export function collectPaneItems(
 	for (const { url, label, spaceId, messageId } of workflows) {
 		entries.push({
 			item: { kind: "workflow", url, label, spaceId },
+			message: at(messageId),
+			withinMessage: 0,
+		});
+	}
+
+	for (const { url, label, spaceId, private: isPrivate, messageId } of spaces) {
+		entries.push({
+			item: { kind: "space", url, label, spaceId, private: isPrivate },
 			message: at(messageId),
 			withinMessage: 0,
 		});
@@ -103,6 +115,9 @@ export function isPaneItemSelected(item: PaneItem, selection: PaneSelection): bo
 	}
 	if (item.kind === "workflow") {
 		return selection.view === "workflow" && selection.workflowUrl === item.url;
+	}
+	if (item.kind === "space") {
+		return selection.view === "space" && selection.spaceUrl === item.url;
 	}
 	return selection.view === "trackio" && selection.trackioUrl === item.url;
 }
