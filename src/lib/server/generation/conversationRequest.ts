@@ -46,6 +46,8 @@ import { turnEnded, turnRunning } from "$lib/server/generation/turnState";
 import { clampStoppedContent } from "$lib/server/stopTruncation";
 import { MetricsServer } from "$lib/server/metrics";
 import { randomUUID } from "$lib/utils/randomUuid";
+import { headlessConfig } from "$lib/server/mlHeadless/config";
+import { isHeadlessSession } from "$lib/server/mlHeadless/session";
 
 // How long a stop marker is protected from the pre-flight cleanup of a new
 // generation. A marker younger than this may still be awaiting observation by
@@ -719,9 +721,13 @@ export async function generateConversationResponse({
 				// Fetch user settings once for all overrides and billing org
 				const userSettings = await collections.settings.findOne(authCondition(locals));
 
-				// Add billing organization to locals for the endpoint to use
-				locals.billingOrganization = userSettings?.billingOrganization;
-				locals.billingResourceGroup = userSettings?.billingResourceGroup;
+				// Add billing organization to locals for the endpoint to use. A headless run
+				// keeps the server's payer and destination whoever continues it.
+				const headless = isHeadlessSession(conv.sessionId) ? headlessConfig() : undefined;
+				const payer = headless ?? userSettings;
+				locals.billingOrganization = payer?.billingOrganization;
+				locals.billingResourceGroup = payer?.billingResourceGroup;
+				if (headless) locals.publishNamespace = headless.publishNamespace;
 
 				let parkedAgain = false;
 				if (resumeElicitationId) {

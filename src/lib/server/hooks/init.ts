@@ -72,6 +72,20 @@ export async function initServer(): Promise<void> {
 		await startSlackBot();
 	}
 
+	if (config.ML_HEADLESS_ENABLED === "true") {
+		// The token's account must exist as a user before its own token passes bearer auth.
+		const [{ headlessConfig }, { provisionHeadlessIdentity }] = await Promise.all([
+			import("$lib/server/mlHeadless/config"),
+			import("$lib/server/mlHeadless/identity"),
+		]);
+		try {
+			const settings = headlessConfig();
+			if (settings) await provisionHeadlessIdentity(settings);
+		} catch (err) {
+			logger.error({ err }, "[ml-headless] could not provision the headless identity");
+		}
+	}
+
 	adminTokenManager.displayToken();
 
 	if (config.EXPOSE_API) {
