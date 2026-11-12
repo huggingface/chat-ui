@@ -6,6 +6,8 @@ import {
 } from "$lib/server/slack/ownerIdentity";
 import { ConnectionError } from "$lib/server/slack/links";
 import { slackLocals } from "$lib/server/slack/identity";
+import { activeHeadlessLocals } from "$lib/server/mlHeadless/identity";
+import { isHeadlessSession } from "$lib/server/mlHeadless/session";
 import { randomUUID } from "crypto";
 import { MongoInvalidArgumentError, MongoServerError } from "mongodb";
 import { collections } from "$lib/server/database";
@@ -293,6 +295,13 @@ export async function rebuildIdentity(park: Pick<ParkedCall, "userId" | "session
 
 	if (user?.slackBotTeamId)
 		return { locals: slackLocals(user), settings: null, tokenExpired: false };
+
+	// A headless run resumes with the server's token. With the feature off, or the token
+	// moved to another account, it falls back to the account's own session below.
+	if (user && isHeadlessSession(park.sessionId)) {
+		const headless = await activeHeadlessLocals(user);
+		if (headless) return { locals: headless, settings: null, tokenExpired: false };
+	}
 
 	const session = park.userId
 		? await collections.sessions.find({ userId: park.userId }).sort({ updatedAt: -1 }).next()
