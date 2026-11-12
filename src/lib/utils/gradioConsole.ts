@@ -4,7 +4,9 @@ export const GRADIO_CONSOLE_PROTOCOL = "gradio-console";
 export const GRADIO_CONSOLE_VERSION = 1;
 
 /** after load, get goes out again at these offsets until a state arrives */
-export const GET_RETRY_MS = [500, 1500, 3000] as const;
+export const GET_RETRY_MS = [500, 1500] as const;
+/** a get at load is answered before the app has booted, so this one always goes out and carries any check */
+export const STARTUP_GET_MS = 3000;
 export const UNSUPPORTED_AFTER_MS = 5000;
 
 const TEXT_MAX = 4096;
@@ -81,7 +83,7 @@ export interface ConsoleReceiverOptions {
 export interface ConsoleReceiver {
 	/** call on every iframe load, a reload restarts the sequence */
 	load(id?: string): void;
-	/** a fresh get at any time, a reply to it upgrades an unsupported frame */
+	/** a get carrying id, held until STARTUP_GET_MS after load, a reply to it upgrades an unsupported frame */
 	request(id: string): void;
 	handleMessage(event: MessageEvent): void;
 	dispose(): void;
@@ -93,6 +95,8 @@ export function createConsoleReceiver(options: ConsoleReceiverOptions): ConsoleR
 	let timers: ReturnType<typeof setTimeout>[] = [];
 	let answered = false;
 	let session: string | undefined;
+	let loadedAt: number | undefined;
+	let pendingId: string | undefined;
 
 	const clearTimers = () => {
 		for (const timer of timers) clearTimeout(timer);
@@ -121,11 +125,20 @@ export function createConsoleReceiver(options: ConsoleReceiverOptions): ConsoleR
 			clearTimers();
 			answered = false;
 			session = undefined;
+			loadedAt = Date.now();
+			pendingId = id;
 			onState("connecting");
-			sendGet(id);
+			sendGet();
 			for (const delay of GET_RETRY_MS) {
-				timers.push(setTimeout(() => !answered && sendGet(id), delay));
+				timers.push(setTimeout(() => !answered && sendGet(), delay));
 			}
+			timers.push(
+				setTimeout(() => {
+					const held = pendingId;
+					pendingId = undefined;
+					sendGet(held);
+				}, STARTUP_GET_MS)
+			);
 			timers.push(
 				setTimeout(() => {
 					if (!answered) onState("unsupported");
@@ -134,7 +147,8 @@ export function createConsoleReceiver(options: ConsoleReceiverOptions): ConsoleR
 		},
 
 		request(id) {
-			sendGet(id);
+			if (loadedAt !== undefined && Date.now() - loadedAt < STARTUP_GET_MS) pendingId = id;
+			else sendGet(id);
 		},
 
 		handleMessage(event) {
@@ -143,7 +157,6 @@ export function createConsoleReceiver(options: ConsoleReceiverOptions): ConsoleR
 			const state = parseConsoleState(event.data);
 			if (!state) return;
 			answered = true;
-			clearTimers();
 			if (state.session_id !== session) {
 				session = state.session_id;
 				onState("connected", {

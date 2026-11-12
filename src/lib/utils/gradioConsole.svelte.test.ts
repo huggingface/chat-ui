@@ -75,18 +75,39 @@ describe("gradio-console receiver against the fixture frame", () => {
 
 		frame.win().console.warn("later");
 		frame.receiver.request("check-2");
-		await vi.waitFor(() => expect(frame.snapshots).toHaveLength(2));
+		await vi.waitFor(() => expect(frame.snapshots).toHaveLength(2), { timeout: 5000 });
 		expect(frame.snapshots[1].id).toBe("check-2");
 		expect(frame.snapshots[1].entries.map((e) => [e.seq, e.text])).toEqual([[3, "later"]]);
 		expect(frame.states.filter((s) => s.state === "connected")).toHaveLength(1);
 	});
 
-	it("copies the get id back, from a load started for a check", async () => {
-		const frame = mount(gradioConsoleFrameDoc(), "check-1");
+	it("holds a check's get until 3 s after load, so startup errors are in its reply", async () => {
+		const frame = mount(
+			gradioConsoleFrameDoc({}, `setTimeout(() => console.error("startup failed"), 1000);`),
+			"check-1"
+		);
 		await frame.first;
+		const loadedAt = Date.now();
 		await vi.waitFor(() => expect(frame.snapshots).toHaveLength(1));
-		expect(frame.snapshots[0].id).toBe("check-1");
-		expect(frame.win().__gets[0]).toMatchObject({ type: "get", id: "check-1" });
+		// what a get at load sees, before the app has booted
+		expect(frame.snapshots[0]).not.toHaveProperty("id");
+		expect(frame.snapshots[0].entries).toEqual([]);
+
+		await vi.waitFor(() => expect(frame.snapshots.at(-1)?.id).toBe("check-1"), { timeout: 5000 });
+		expect(Date.now() - loadedAt).toBeGreaterThanOrEqual(2900);
+		expect(frame.entries().map((e) => [e.level, e.text])).toEqual([["error", "startup failed"]]);
+		expect(frame.win().__gets).toEqual([
+			{ protocol: "gradio-console", version: 1, type: "get" },
+			{ protocol: "gradio-console", version: 1, type: "get", id: "check-1" },
+		]);
+	});
+
+	it("sends a check's get at once when the frame loaded more than 3 s ago", async () => {
+		const frame = mount(gradioConsoleFrameDoc({}, `console.log("ready");`));
+		await frame.first;
+		await vi.waitFor(() => expect(frame.win().__gets).toHaveLength(2), { timeout: 5000 });
+		frame.receiver.request("check-2");
+		await vi.waitFor(() => expect(frame.snapshots.at(-1)?.id).toBe("check-2"), { timeout: 500 });
 	});
 
 	it("reports the total the frame dropped since load", async () => {

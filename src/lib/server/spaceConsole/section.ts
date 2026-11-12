@@ -5,12 +5,12 @@ import { readConsoleEntries, readFrame } from "./store";
 export interface ConsoleWaits {
 	/** for the tab to get the update, open the pane and report it */
 	attachMs: number;
-	/** for the frame to answer this check, the pane gives a fresh load 5 s */
+	/** for the frame to answer this check, the pane holds the get until 3 s after the frame loads */
 	answerMs: number;
 	pollMs: number;
 }
 
-export const CONSOLE_WAITS: ConsoleWaits = { attachMs: 4000, answerMs: 6500, pollMs: 250 };
+export const CONSOLE_WAITS: ConsoleWaits = { attachMs: 4000, answerMs: 9000, pollMs: 250 };
 
 const SHOW_HEAD = 10;
 const SHOW_TAIL = 30;
