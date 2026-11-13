@@ -1,14 +1,11 @@
 <script lang="ts">
-	import { sidePane } from "$lib/stores/sidePane.svelte";
+	import { sidePane, type PaneTabOf } from "$lib/stores/sidePane.svelte";
 	import { subscribeToTheme } from "$lib/switchTheme";
-	import SidePane from "./SidePane.svelte";
 
 	import type { PaneItem } from "$lib/utils/paneItems";
 	import { TRACKIO_FRAME_SANDBOX } from "$lib/utils/trackio";
-	import PaneItemNav from "./PaneItemNav.svelte";
 
 	import CarbonChartLine from "~icons/carbon/chart-line";
-	import CarbonCloseLarge from "~icons/carbon/close-large";
 	import CarbonLaunch from "~icons/carbon/launch";
 	import CarbonRenew from "~icons/carbon/renew";
 	import LucideMessageSquarePlus from "~icons/lucide/message-square-plus";
@@ -37,11 +34,15 @@
 		 * longer in the list.
 		 */
 		items: PaneItem[];
+		/** the tab this view belongs to; several can be open at once */
+		tab: PaneTabOf<"trackio">;
+		/** set while the pane edge is dragged, so the frame does not swallow the pointer */
+		resizing?: boolean;
 	}
 
-	let { items }: Props = $props();
+	let { items, tab, resizing = false }: Props = $props();
 
-	let dashboard = $derived(sidePane.trackio);
+	let dashboard = $derived(tab);
 	let present = $derived(
 		!!dashboard && items.some((item) => item.kind === "trackio" && item.url === dashboard?.url)
 	);
@@ -53,8 +54,8 @@
 	 * generation is invalidated and refetched, and those must not close it.
 	 */
 	$effect(() => {
-		if (sidePane.open && sidePane.view === "trackio" && dashboard && !present) {
-			const timer = setTimeout(() => sidePane.close(), 300);
+		if (dashboard && !present) {
+			const timer = setTimeout(() => sidePane.closeTab(tab.id), 300);
 			return () => clearTimeout(timer);
 		}
 	});
@@ -190,74 +191,61 @@
 	}
 </script>
 
-{#if sidePane.open && sidePane.view === "trackio" && dashboard}
-	<SidePane label="Training dashboard">
-		{#snippet children(resizing)}
-			<header
-				class="@container relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
-			>
-				<PaneItemNav {items} />
-				<div class="flex min-w-0 flex-1 items-baseline gap-2">
-					<h2 class="min-w-0 truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
-						Training dashboard
-					</h2>
-					<span
-						class="truncate font-mono text-xs text-gray-400 @max-[380px]:hidden dark:text-gray-500"
-					>
-						{dashboard.label}
-					</span>
-				</div>
+<div class="flex h-full min-h-0 flex-col">
+	<header
+		class="@container relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
+	>
+		<div class="flex min-w-0 flex-1 items-baseline gap-2">
+			<h2 class="min-w-0 truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
+				Training dashboard
+			</h2>
+			<span class="truncate font-mono text-xs text-gray-400 @max-[380px]:hidden dark:text-gray-500">
+				{dashboard.label}
+			</span>
+		</div>
 
-				<div class="flex flex-none items-center gap-0.5 text-gray-500 dark:text-gray-400">
-					{#if viewReady}
-						<button
-							type="button"
-							class="mr-1 btn gap-1.5 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:border-[#c4511a]/40 hover:text-[#c4511a] disabled:opacity-60 dark:border-gray-700 dark:text-gray-300 dark:hover:border-[#f0a468]/40 dark:hover:text-[#f0a468]"
-							title={captureError ??
-								"Attach what you are looking at — runs, zoomed range, charts on screen — to your next message"}
-							aria-label="Add to chat"
-							disabled={capturing}
-							onclick={addViewToChat}
-						>
-							<LucideMessageSquarePlus class="size-3.5" />
-							<!-- The pane can be dragged narrow on any screen, so its own width
+		<div class="flex flex-none items-center gap-0.5 text-gray-500 dark:text-gray-400">
+			{#if viewReady}
+				<button
+					type="button"
+					class="mr-1 btn gap-1.5 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:border-[#c4511a]/40 hover:text-[#c4511a] disabled:opacity-60 dark:border-gray-700 dark:text-gray-300 dark:hover:border-[#f0a468]/40 dark:hover:text-[#f0a468]"
+					title={captureError ??
+						"Attach what you are looking at — runs, zoomed range, charts on screen — to your next message"}
+					aria-label="Add to chat"
+					disabled={capturing}
+					onclick={addViewToChat}
+				>
+					<LucideMessageSquarePlus class="size-3.5" />
+					<!-- The pane can be dragged narrow on any screen, so its own width
 							     decides, not the viewport's. -->
-							<span class="hidden @min-[420px]:inline">Add to chat</span>
-						</button>
-					{/if}
-					<button
-						type="button"
-						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-						title="Reload the dashboard"
-						onclick={() => (reloadNonce += 1)}
-					>
-						<CarbonRenew />
-					</button>
-					<!-- The URL is allowlisted to *.hf.space at extraction, so this opens
+					<span class="hidden @min-[420px]:inline">Add to chat</span>
+				</button>
+			{/if}
+			<button
+				type="button"
+				class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+				title="Reload the dashboard"
+				onclick={() => (reloadNonce += 1)}
+			>
+				<CarbonRenew />
+			</button>
+			<!-- The URL is allowlisted to *.hf.space at extraction, so this opens
 					     directly instead of going through the external-link confirm the
 					     artifact previews need for model-supplied hrefs. -->
-					<a
-						href={dashboard.url}
-						target="_blank"
-						rel="noopener noreferrer"
-						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-						title="Open dashboard in a new tab"
-					>
-						<CarbonLaunch />
-					</a>
-					<button
-						type="button"
-						class="ml-0.5 btn rounded-md p-1 text-base hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-						title="Close panel (Esc)"
-						onclick={() => sidePane.close()}
-					>
-						<CarbonCloseLarge />
-					</button>
-				</div>
-			</header>
+			<a
+				href={dashboard.url}
+				target="_blank"
+				rel="noopener noreferrer"
+				class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+				title="Open dashboard in a new tab"
+			>
+				<CarbonLaunch />
+			</a>
+		</div>
+	</header>
 
-			<div class="relative min-h-0 flex-1 bg-white dark:bg-gray-900">
-				<!-- Sits BEHIND the frame rather than being toggled on a load event.
+	<div class="relative min-h-0 flex-1 bg-white dark:bg-gray-900">
+		<!-- Sits BEHIND the frame rather than being toggled on a load event.
 				     Trackio serves a bare `<div id="app">` shell, so `load` fires well
 				     before anything is painted, and a Space that is still building
 				     shows nothing at all for a while. An unpainted iframe is
@@ -266,44 +254,40 @@
 				     and is covered the moment the dashboard paints its own background.
 				     No timers, no readiness guessing, and it comes back by itself on
 				     reload or a theme change. -->
-				<div
-					class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center"
-					role="status"
-					aria-live="polite"
-				>
-					<span
-						class="trackio-pulse flex size-11 items-center justify-center rounded-xl
+		<div
+			class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center"
+			role="status"
+			aria-live="polite"
+		>
+			<span
+				class="trackio-pulse flex size-11 items-center justify-center rounded-xl
 						bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
-					>
-						<CarbonChartLine class="text-xl" />
-					</span>
-					<div class="flex flex-col gap-1">
-						<p class="text-sm font-medium text-gray-600 dark:text-gray-300">
-							Starting the dashboard
-						</p>
-						<p class="max-w-xs text-xs text-gray-400 dark:text-gray-500">
-							Trackio Spaces can take a minute to build on the first run. Metrics appear as soon as
-							it is up.
-						</p>
-					</div>
-					<span class="font-mono text-xxs text-gray-300 dark:text-gray-600">{dashboard.label}</span>
-				</div>
-				{#key `${frameUrl}:${reloadNonce}`}
-					<iframe
-						title="Trackio dashboard"
-						class="relative h-full w-full {resizing ? 'pointer-events-none' : ''}"
-						src={frameUrl}
-						bind:this={frame}
-						onload={probeOnLoad}
-						sandbox={TRACKIO_FRAME_SANDBOX}
-						allowfullscreen
-						referrerpolicy="no-referrer"
-					></iframe>
-				{/key}
+			>
+				<CarbonChartLine class="text-xl" />
+			</span>
+			<div class="flex flex-col gap-1">
+				<p class="text-sm font-medium text-gray-600 dark:text-gray-300">Starting the dashboard</p>
+				<p class="max-w-xs text-xs text-gray-400 dark:text-gray-500">
+					Trackio Spaces can take a minute to build on the first run. Metrics appear as soon as it
+					is up.
+				</p>
 			</div>
-		{/snippet}
-	</SidePane>
-{/if}
+			<span class="font-mono text-xxs text-gray-300 dark:text-gray-600">{dashboard.label}</span>
+		</div>
+		{#key `${frameUrl}:${reloadNonce}`}
+			<iframe
+				title="Trackio dashboard"
+				class="relative h-full w-full {resizing ? 'pointer-events-none' : ''}"
+				src={frameUrl}
+				bind:this={frame}
+				onload={probeOnLoad}
+				sandbox={TRACKIO_FRAME_SANDBOX}
+				allowfullscreen
+				referrerpolicy="no-referrer"
+			></iframe>
+		{/key}
+	</div>
+</div>
 
 <style>
 	/* Breathing rather than spinning: the wait is a minute-scale build, not a

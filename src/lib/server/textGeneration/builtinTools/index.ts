@@ -11,6 +11,7 @@ import { createSandboxTool } from "./sandboxTool";
 import { createJobCheckTool } from "./jobCheckTool";
 import { createTrackioTool } from "./createTrackioTool";
 import { createReadTrackioTool } from "./readTrackioTool";
+import { createOpenPaperTool, createReadPaperTool } from "./paperTools";
 import { createWorkflowTool, workflowsEnabled } from "./createWorkflowTool";
 import { createFileTools } from "./fileTools";
 import { createImportFileTool } from "./importFileTool";
@@ -24,6 +25,7 @@ export { SANDBOX_TOOL_NAME, isSandboxTool } from "./sandboxTool";
 export { JOB_CHECK_TOOL_NAME, isJobCheckTool } from "./jobCheckTool";
 export { CREATE_TRACKIO_TOOL_NAME } from "./createTrackioTool";
 export { READ_TRACKIO_TOOL_NAME } from "./readTrackioTool";
+export { OPEN_PAPER_TOOL_NAME, READ_PAPER_TOOL_NAME } from "./paperTools";
 export { CREATE_WORKFLOW_TOOL_NAME } from "./createWorkflowTool";
 export { WRITE_FILE_TOOL_NAME, EDIT_FILE_TOOL_NAME, READ_FILE_TOOL_NAME } from "./fileTools";
 export { IMPORT_FILE_TOOL_NAME } from "./importFileTool";
@@ -65,6 +67,8 @@ export function getEnabledBuiltinTools(params: {
 			() => params.conv.messages ?? [],
 			() => params.hfToken
 		),
+		createOpenPaperTool(),
+		createReadPaperTool(),
 		...(workflowsEnabled()
 			? [
 					createWorkflowTool(

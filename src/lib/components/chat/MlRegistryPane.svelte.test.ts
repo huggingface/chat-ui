@@ -158,12 +158,6 @@ describe("MlRegistryPane", () => {
 		expect(text(pane.querySelector("h2"))).toBe("Resources");
 	});
 
-	it("closes from its own header", () => {
-		const { container } = mount();
-		find(container, "button[title^='Close panel']").click();
-		expect(sidePane.open).toBe(false);
-	});
-
 	it("closes once its conversation is left", async () => {
 		mount();
 		expect(sidePane.open).toBe(true);

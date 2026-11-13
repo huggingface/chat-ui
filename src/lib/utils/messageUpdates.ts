@@ -1,5 +1,6 @@
 import type { MessageFile } from "$lib/types/Message";
 import type { TrackioDashboardView } from "$lib/utils/trackioView";
+import type { PaperQuote } from "$lib/utils/paper";
 import {
 	type MessageUpdate,
 	type MessageToolUpdate,
@@ -36,6 +37,7 @@ type MessageUpdateRequestOptions = {
 	generationId?: string;
 	files?: MessageFile[];
 	dashboardViews?: TrackioDashboardView[];
+	paperQuotes?: PaperQuote[];
 	// Optional: pass selected MCP server names (client-side selection)
 	selectedMcpServerNames?: string[];
 	// Optional: pass selected MCP server configs (for custom client-defined servers)
@@ -86,6 +88,7 @@ export async function fetchMessageUpdates(
 		selectedMcpServers: opts.selectedMcpServers,
 		timezone: opts.timezone,
 		...(opts.dashboardViews?.length ? { dashboardViews: opts.dashboardViews } : {}),
+		...(opts.paperQuotes?.length ? { paperQuotes: opts.paperQuotes } : {}),
 	});
 
 	opts.files?.forEach((file) => {

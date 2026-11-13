@@ -3,6 +3,7 @@ import type { EndpointMessage } from "./endpoints";
 import { downloadFile } from "../files/downloadFile";
 import type { ObjectId } from "mongodb";
 import { withTrackioViewContext } from "$lib/utils/trackioView";
+import { withPaperQuoteContext } from "$lib/utils/paper";
 import { plainMentions } from "$lib/utils/mentionTokens";
 
 export async function preprocessMessages(
@@ -34,7 +35,7 @@ function injectTrackioViews(messages: EndpointMessage[]): EndpointMessage[] {
 	return messages.map((message) => {
 		if (message.from !== "user") return message;
 		const content = withTrackioViewContext(
-			plainMentions(message.content),
+			withPaperQuoteContext(plainMentions(message.content), message.paperQuotes ?? []),
 			message.dashboardViews ?? []
 		);
 		return content === message.content ? message : { ...message, content };
