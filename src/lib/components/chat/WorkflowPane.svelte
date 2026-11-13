@@ -65,13 +65,14 @@
 
 	let asking = $state<{ spaceId: string; answer: (yes: boolean) => void } | null>(null);
 
-	async function consent(spaceId: string): Promise<boolean> {
+	async function consent(spaceId: string, ask: boolean): Promise<boolean> {
 		const key = `workflow-inference-consent:${spaceId}`;
 		try {
 			if (localStorage.getItem(key) === "yes") return true;
 		} catch {
 			// storage blocked: ask every time
 		}
+		if (!ask) return false;
 		const yes = await new Promise<boolean>((answer) => (asking = { spaceId, answer }));
 		asking = null;
 		if (!yes) {
@@ -96,7 +97,7 @@
 			origin,
 			spaceId,
 			viewer: page.data.user?.username,
-			consent: () => consent(spaceId),
+			consent: (ask) => consent(spaceId, ask),
 		});
 		window.addEventListener("message", onMessage);
 		return () => {

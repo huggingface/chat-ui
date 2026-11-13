@@ -42,6 +42,8 @@ export function collectWorkflowSpaces(
 
 export const INFERENCE_JWT_REQUEST = "INFERENCE_JWT_REQUEST";
 export const INFERENCE_JWT_RESPONSE = "INFERENCE_JWT_RESPONSE";
+export const INFERENCE_JWT_PROBE = "INFERENCE_JWT_PROBE";
+export const INFERENCE_JWT_PROBE_RESPONSE = "INFERENCE_JWT_PROBE_RESPONSE";
 
 export async function fetchInferenceToken(): Promise<{ token: string; exp: number } | null> {
 	try {
@@ -95,7 +97,7 @@ export function workflowTokenHandler({
 	origin: string;
 	spaceId: string;
 	viewer: string | undefined;
-	consent: () => boolean | Promise<boolean>;
+	consent: (ask: boolean) => boolean | Promise<boolean>;
 }): (event: MessageEvent) => Promise<void> {
 	const owned = !!viewer && spaceId.split("/")[0] === viewer;
 	const session = crypto.randomUUID();
@@ -134,9 +136,19 @@ export function workflowTokenHandler({
 			event.ports[0]?.postMessage(visible() ? await zeroGpuHeaders() : {});
 			return;
 		}
-		if ((event.data as { type?: unknown })?.type !== INFERENCE_JWT_REQUEST) return;
+		const type = (event.data as { type?: unknown })?.type;
+		if (type === INFERENCE_JWT_PROBE) {
+			const reply =
+				visible() && (owned || (await (allowed ?? consent(false)))) ? await inferenceToken() : null;
+			source.postMessage(
+				{ type: INFERENCE_JWT_PROBE_RESPONSE, token: reply?.token ?? null, exp: reply?.exp },
+				origin
+			);
+			return;
+		}
+		if (type !== INFERENCE_JWT_REQUEST) return;
 		const reply =
-			visible() && (await (allowed ??= Promise.resolve(owned || consent())))
+			visible() && (await (allowed ??= Promise.resolve(owned || consent(true))))
 				? await inferenceToken()
 				: null;
 		source.postMessage(
