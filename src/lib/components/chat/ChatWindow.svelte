@@ -1083,7 +1083,7 @@
 			<ShareConversationModal
 				open={shareModalOpen}
 				onclose={() => shareModal.close()}
-				downloadTrace={mlModeOn}
+				exportTrace={mlModeOn}
 			/>
 		{/if}
 		{#if canShare}

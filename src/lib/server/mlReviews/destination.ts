@@ -226,7 +226,7 @@ const COMMIT_RACE_WAITS_MS = [2_000, 4_000, 8_000, 16_000];
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** a bucket created a moment ago still 404s its xet write token */
-async function afterCreate<T>(write: () => Promise<T>): Promise<T> {
+export async function afterCreate<T>(write: () => Promise<T>): Promise<T> {
 	for (const wait of CREATE_SETTLE_MS) {
 		try {
 			return await write();

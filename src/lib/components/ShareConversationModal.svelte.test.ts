@@ -1,17 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { userEvent } from "@vitest/browser/context";
 import { renderWithApp } from "$lib/components/__tests__/renderWithApp";
 import ShareConversationModal from "./ShareConversationModal.svelte";
 
 const ID = "66f9a1b2c3d4e5f6a7b8c9d0";
 
-function mount(downloadTrace: boolean, id = ID) {
+function mount(exportTrace: boolean, id = ID, user?: { username: string }) {
 	renderWithApp(
 		ShareConversationModal,
-		{ open: true, downloadTrace },
-		{ page: { params: { id }, data: { publicConfig: {} } } }
+		{ open: true, exportTrace },
+		{ page: { params: { id }, data: { publicConfig: {}, user } } }
 	);
 	return document.querySelector<HTMLAnchorElement>("a[download]");
 }
+
+const repoInput = () =>
+	document.querySelector<HTMLInputElement>('input[aria-label="Dataset repo"]');
+const pushButton = () =>
+	[...document.querySelectorAll("button")].find((b) => b.textContent?.includes("Push"));
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("ShareConversationModal trace download", () => {
 	it("links the conversation's export when asked to", () => {
@@ -21,10 +29,62 @@ describe("ShareConversationModal trace download", () => {
 	});
 
 	it("offers nothing outside ML mode", () => {
-		expect(mount(false)).toBeNull();
+		expect(mount(false, ID, { username: "alice" })).toBeNull();
+		expect(repoInput()).toBeNull();
 	});
 
 	it("offers nothing on a share snapshot", () => {
-		expect(mount(true, "abc1234")).toBeNull();
+		expect(mount(true, "abc1234", { username: "alice" })).toBeNull();
+		expect(repoInput()).toBeNull();
+	});
+});
+
+describe("ShareConversationModal push to dataset", () => {
+	it("needs a Hugging Face user", () => {
+		mount(true);
+		expect(repoInput()).toBeNull();
+	});
+
+	it("suggests a dataset in the user's namespace and links the pushed file", async () => {
+		const calls: { url: string; body: unknown }[] = [];
+		vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+			calls.push({ url, body: JSON.parse(String(init?.body)) });
+			return Response.json({
+				url: "https://huggingface.co/datasets/alice/t/blob/main/x.json",
+				created: true,
+			});
+		});
+		mount(true, ID, { username: "alice" });
+		expect(repoInput()?.value).toBe("alice/ml-intern-traces");
+
+		await userEvent.click(pushButton() as HTMLElement);
+
+		await expect.poll(() => document.body.textContent).toContain("Created the private dataset");
+		expect(calls).toEqual([
+			{
+				url: `/api/v2/conversations/${ID}/export/dataset`,
+				body: { repo: "alice/ml-intern-traces" },
+			},
+		]);
+		const hubLink = [...document.querySelectorAll("a")].find(
+			(a) => a.textContent === "View on the Hub"
+		);
+		expect(hubLink?.getAttribute("href")).toBe(
+			"https://huggingface.co/datasets/alice/t/blob/main/x.json"
+		);
+	});
+
+	it("shows the server's reason when the push fails", async () => {
+		vi.stubGlobal("fetch", async () =>
+			Response.json(
+				{ message: "Your Hugging Face sign-in cannot write to org/x." },
+				{ status: 403 }
+			)
+		);
+		mount(true, ID, { username: "alice" });
+
+		await userEvent.click(pushButton() as HTMLElement);
+
+		await expect.poll(() => document.body.textContent).toContain("cannot write to org/x");
 	});
 });
