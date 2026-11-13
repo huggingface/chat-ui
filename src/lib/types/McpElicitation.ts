@@ -103,7 +103,7 @@ export interface ElicitationRequestPayload {
 
 /** In the database because the pod serving the answer need not be the one waiting on it. */
 export interface McpElicitation extends Timestamps {
-	/** The Slack submitter explicitly shares this assistant question answer in its thread. */
+	/** read through mlRun, renaming stored fields needs a migration in flight questions survive */
 	slackShareAnswer?: boolean;
 	slackChoices?: Record<string, number>;
 	slackChoiceRevision?: number;
