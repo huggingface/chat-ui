@@ -50,4 +50,6 @@ export interface FeatureFlags {
 	mlAssistantModels: string[];
 	/** Set when this user opted in to syncing MCP servers for personal Slack sessions. */
 	slackMcpSync: { saved: boolean } | null;
+	/** whether the user token can push a trace to a hub dataset */
+	traceDatasetPush: boolean;
 }

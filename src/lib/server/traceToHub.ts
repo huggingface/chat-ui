@@ -1,25 +1,51 @@
-import { commit, createRepo, HubApiError, type RepoDesignation } from "@huggingface/hub";
+import {
+	commit,
+	createRepo,
+	datasetInfo,
+	HubApiError,
+	type RepoDesignation,
+} from "@huggingface/hub";
 import { z } from "zod";
-import { afterCreate } from "$lib/server/mlReviews/destination";
+import { afterCreate } from "$lib/server/hubAfterCreate";
+import { logger } from "$lib/server/logger";
+
+const REPO_SEGMENT = "[\\w-][\\w.-]*";
 
 export const traceRepoSchema = z
 	.string()
 	.trim()
-	.transform((repo) => repo.replace(/^(https:\/\/huggingface\.co\/)?datasets\//, ""))
-	.pipe(z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'Dataset must be "owner/name"'));
+	.transform((repo) =>
+		repo
+			.replace(/^https?:\/\/(www\.)?(huggingface\.co|hf\.co)\//, "")
+			.replace(/^datasets\//, "")
+			.replace(/\/+$/, "")
+	)
+	.pipe(
+		z
+			.string()
+			.regex(
+				new RegExp(`^(?!.*\\.\\.)${REPO_SEGMENT}/${REPO_SEGMENT}$`),
+				'Dataset must be "owner/name"'
+			)
+	);
 
-export const tracePath = (filename: string) => `traces/${filename}`;
+export const tracePath = (conversationId: string) => `traces/${conversationId}.json`;
 
-export class TracePushError extends Error {
-	constructor(
-		message: string,
-		readonly status: number
-	) {
-		super(message);
-	}
-}
+export type TracePushResult =
+	| { ok: true; url: string; created: boolean; private: boolean }
+	| { ok: false; status: number; message: string; code?: "public-dataset" };
 
 const statusOf = (err: unknown) => (err instanceof HubApiError ? err.statusCode : undefined);
+
+async function visibility(name: string, accessToken: string) {
+	try {
+		const info = await datasetInfo({ name, accessToken });
+		return info.private ? "private" : "public";
+	} catch (err) {
+		if (statusOf(err) === 404) return "missing";
+		throw err;
+	}
+}
 
 export async function pushTraceToDataset(params: {
 	repo: string;
@@ -27,8 +53,9 @@ export async function pushTraceToDataset(params: {
 	path: string;
 	content: string;
 	title: string;
-}): Promise<{ url: string; created: boolean }> {
-	const { repo: name, accessToken, path, content, title } = params;
+	allowPublic: boolean;
+}): Promise<TracePushResult> {
+	const { repo: name, accessToken, path, content, title, allowPublic } = params;
 	const repo: RepoDesignation = { type: "dataset", name };
 	const write = () =>
 		commit({
@@ -46,29 +73,44 @@ export async function pushTraceToDataset(params: {
 
 	let created = false;
 	try {
-		try {
-			await write();
-		} catch (err) {
-			if (statusOf(err) !== 404) throw err;
-			// the hub 404s a commit to a private repo the token cannot see, then 409s creating it
-			await createRepo({ repo, accessToken, private: true }).catch((createErr) => {
-				throw statusOf(createErr) === 409 ? new HubApiError("", 403) : createErr;
+		const seen = await visibility(name, accessToken);
+		if (seen === "public" && !allowPublic) {
+			return {
+				ok: false,
+				status: 409,
+				code: "public-dataset",
+				message: `${name} is public, anyone will be able to read this trace.`,
+			};
+		}
+		if (seen === "missing") {
+			// the hub 404s a private repo the token cannot see, then 409s creating it
+			await createRepo({ repo, accessToken, private: true }).catch((err) => {
+				throw statusOf(err) === 409 ? new HubApiError("", 403) : err;
 			});
 			created = true;
 			await afterCreate(write);
+		} else {
+			await write();
 		}
+		return {
+			ok: true,
+			url: `https://huggingface.co/datasets/${name}/blob/main/${path}`,
+			created,
+			private: seen !== "public",
+		};
 	} catch (err) {
 		const status = statusOf(err);
+		logger.warn({ err, repo: name, status }, "[trace] push to dataset failed");
 		if (status === 401 || status === 403) {
-			throw new TracePushError(`Your Hugging Face sign-in cannot write to ${name}.`, 403);
+			return {
+				ok: false,
+				status: 403,
+				message: `Hugging Face did not let this sign-in write to ${name}. The app can only write to datasets it created, so try a new dataset name.`,
+			};
 		}
 		if (status === 409) {
-			throw new TracePushError(`${name} is busy with another commit, try again.`, 409);
+			return { ok: false, status: 409, message: `${name} is busy with another commit, try again.` };
 		}
-		throw new TracePushError(
-			err instanceof Error ? err.message : "The Hub rejected the upload.",
-			502
-		);
+		return { ok: false, status: 502, message: "The push to the Hub failed, try again." };
 	}
-	return { url: `https://huggingface.co/datasets/${name}/blob/main/${path}`, created };
 }

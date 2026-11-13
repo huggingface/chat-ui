@@ -27,27 +27,32 @@
 			: undefined
 	);
 
-	let username: string | undefined = $derived(page.data.user?.username);
+	let canPush = $derived(Boolean(traceUrl && page.data.traceDatasetPush));
 	let datasetRepo = $state(
 		page.data.user?.username ? `${page.data.user.username}/ml-intern-traces` : ""
 	);
 	let pushing = $state(false);
-	let pushed: { url: string; created: boolean } | null = $state(null);
+	let pushed: { url: string; created: boolean; private: boolean } | null = $state(null);
 	let pushError: string | null = $state(null);
+	let publicWarning: string | null = $state(null);
 
-	async function handlePush(event: SubmitEvent) {
-		event.preventDefault();
+	async function push(allowPublic: boolean) {
 		if (!traceUrl || pushing) return;
 		pushing = true;
 		pushed = null;
 		pushError = null;
+		publicWarning = null;
 		try {
 			const res = await fetch(`${traceUrl}/dataset`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ repo: datasetRepo }),
+				body: JSON.stringify({ repo: datasetRepo, allowPublic }),
 			});
 			const body = await res.json().catch(() => null);
+			if (body?.code === "public-dataset") {
+				publicWarning = body.message;
+				return;
+			}
 			if (!res.ok) throw new Error(body?.message || `Push failed (${res.status})`);
 			pushed = body;
 		} catch (e) {
@@ -55,6 +60,12 @@
 		} finally {
 			pushing = false;
 		}
+	}
+
+	function resetPush() {
+		pushed = null;
+		pushError = null;
+		publicWarning = null;
 	}
 
 	let creating = $state(false);
@@ -242,14 +253,21 @@
 						Download
 					</a>
 				</div>
-				{#if username}
-					<form class="flex flex-col gap-2" onsubmit={handlePush}>
+				{#if canPush}
+					<form
+						class="flex flex-col gap-2"
+						onsubmit={(event) => {
+							event.preventDefault();
+							push(false);
+						}}
+					>
 						<div class="min-w-0">
 							<div class="text-sm font-medium text-gray-800 dark:text-gray-200">
 								Push trace to a dataset
 							</div>
 							<div class="text-sm text-gray-600 dark:text-gray-400">
-								Uploads the same JSON to <code>traces/</code>. A new dataset is created private.
+								Saves the same JSON in the dataset as <code>traces/{page.params.id}.json</code>. A
+								dataset that does not exist yet is created private.
 							</div>
 						</div>
 						<div class="flex items-center gap-2">
@@ -260,10 +278,7 @@
 								spellcheck="false"
 								autocomplete="off"
 								bind:value={datasetRepo}
-								oninput={() => {
-									pushed = null;
-									pushError = null;
-								}}
+								oninput={resetPush}
 							/>
 							<button
 								type="submit"
@@ -282,12 +297,28 @@
 						{#if pushed}
 							<div class="text-sm text-gray-600 dark:text-gray-400">
 								<CarbonCheckmark class="inline text-green-600 dark:text-green-400" />
-								{pushed.created ? "Created the private dataset and pushed." : "Pushed."}
+								{pushed.created
+									? "Created the private dataset and pushed."
+									: pushed.private
+										? "Pushed."
+										: "Pushed to the public dataset."}
 								<a
 									href={pushed.url}
 									target="_blank"
 									rel="noreferrer"
 									class="underline hover:text-gray-800 dark:hover:text-gray-200">View on the Hub</a
+								>
+							</div>
+						{:else if publicWarning}
+							<div
+								class="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-500/10 dark:text-amber-200"
+							>
+								<span class="min-w-0 flex-1">{publicWarning}</span>
+								<button
+									type="button"
+									disabled={pushing}
+									class="flex-none font-medium underline disabled:opacity-50"
+									onclick={() => push(true)}>Push anyway</button
 								>
 							</div>
 						{:else if pushError}

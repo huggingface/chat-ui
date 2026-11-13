@@ -20,6 +20,7 @@ import type {
 	ReviewRecord,
 } from "$lib/types/MlReview";
 import { isAnswered, recordStatus } from "$lib/utils/review/answers";
+import { afterCreate } from "$lib/server/hubAfterCreate";
 import { columnOf, isMediaType } from "./features";
 
 /** a push quiet this long is reported failed, never retried, as its commit may have landed */
@@ -219,24 +220,10 @@ async function reviewerName(conversationId: ObjectId): Promise<string> {
 
 const statusOf = (err: unknown) => (err instanceof HubApiError ? err.statusCode : undefined);
 
-const CREATE_SETTLE_MS = [1_000, 2_000, 4_000];
 /** a 409 means another commit to the repo is still running, the probe saw one take 30 s */
 const COMMIT_RACE_WAITS_MS = [2_000, 4_000, 8_000, 16_000];
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** a bucket created a moment ago still 404s its xet write token */
-export async function afterCreate<T>(write: () => Promise<T>): Promise<T> {
-	for (const wait of CREATE_SETTLE_MS) {
-		try {
-			return await write();
-		} catch (err) {
-			if (statusOf(err) !== 404) throw err;
-			await sleep(wait);
-		}
-	}
-	return write();
-}
 
 /** a later batch to the same path lands beside the first */
 export function besidePath(path: string, reviewId: string): string {

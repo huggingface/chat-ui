@@ -5,11 +5,11 @@ import ShareConversationModal from "./ShareConversationModal.svelte";
 
 const ID = "66f9a1b2c3d4e5f6a7b8c9d0";
 
-function mount(exportTrace: boolean, id = ID, user?: { username: string }) {
+function mount(exportTrace: boolean, id = ID, user?: { username: string }, canPush = !!user) {
 	renderWithApp(
 		ShareConversationModal,
 		{ open: true, exportTrace },
-		{ page: { params: { id }, data: { publicConfig: {}, user } } }
+		{ page: { params: { id }, data: { publicConfig: {}, user, traceDatasetPush: canPush } } }
 	);
 	return document.querySelector<HTMLAnchorElement>("a[download]");
 }
@@ -40,9 +40,14 @@ describe("ShareConversationModal trace download", () => {
 });
 
 describe("ShareConversationModal push to dataset", () => {
-	it("needs a Hugging Face user", () => {
-		mount(true);
+	it("needs a sign-in that can write to the Hub", () => {
+		mount(true, ID, { username: "alice" }, false);
 		expect(repoInput()).toBeNull();
+	});
+
+	it("names the file the trace lands in", () => {
+		mount(true, ID, { username: "alice" });
+		expect(document.body.textContent).toContain(`traces/${ID}.json`);
 	});
 
 	it("suggests a dataset in the user's namespace and links the pushed file", async () => {
@@ -63,7 +68,7 @@ describe("ShareConversationModal push to dataset", () => {
 		expect(calls).toEqual([
 			{
 				url: `/api/v2/conversations/${ID}/export/dataset`,
-				body: { repo: "alice/ml-intern-traces" },
+				body: { repo: "alice/ml-intern-traces", allowPublic: false },
 			},
 		]);
 		const hubLink = [...document.querySelectorAll("a")].find(
@@ -86,5 +91,37 @@ describe("ShareConversationModal push to dataset", () => {
 		await userEvent.click(pushButton() as HTMLElement);
 
 		await expect.poll(() => document.body.textContent).toContain("cannot write to org/x");
+	});
+
+	it("pushes to a public dataset only after a second click", async () => {
+		const bodies: unknown[] = [];
+		vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
+			const body = JSON.parse(String(init?.body));
+			bodies.push(body);
+			return body.allowPublic
+				? Response.json({ url: "https://huggingface.co/x", created: false, private: false })
+				: Response.json(
+						{
+							code: "public-dataset",
+							message: "alice/open is public, anyone will be able to read this trace.",
+						},
+						{ status: 409 }
+					);
+		});
+		mount(true, ID, { username: "alice" });
+
+		await userEvent.click(pushButton() as HTMLElement);
+		await expect.poll(() => document.body.textContent).toContain("alice/open is public");
+
+		const anyway = [...document.querySelectorAll("button")].find(
+			(b) => b.textContent === "Push anyway"
+		);
+		await userEvent.click(anyway as HTMLElement);
+
+		await expect.poll(() => document.body.textContent).toContain("Pushed to the public dataset");
+		expect(bodies).toEqual([
+			{ repo: "alice/ml-intern-traces", allowPublic: false },
+			{ repo: "alice/ml-intern-traces", allowPublic: true },
+		]);
 	});
 });

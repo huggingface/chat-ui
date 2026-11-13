@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ObjectId } from "mongodb";
-import { ready } from "$lib/server/database";
+import { collections, ready } from "$lib/server/database";
 import {
 	cleanupTestData,
 	createTestConversation,
@@ -12,10 +12,14 @@ vi.mock("$lib/utils/mlAssistantFlag", () => ({ ML_ASSISTANT_MODE: true }));
 vi.mock("$lib/server/logger", () => ({
 	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), trace: vi.fn() },
 }));
+vi.mock("$lib/server/apiToken", () => ({
+	getUserHubWriteToken: (locals: App.Locals) => locals.token,
+}));
 vi.mock("@huggingface/hub", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@huggingface/hub")>()),
 	commit: vi.fn(),
 	createRepo: vi.fn(async () => ({ repoUrl: "" })),
+	datasetInfo: vi.fn(),
 }));
 
 const hub = await import("@huggingface/hub");
@@ -56,6 +60,8 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 		vi.mocked(hub.commit).mockReset();
 		vi.mocked(hub.commit).mockResolvedValue(undefined as never);
 		vi.mocked(hub.createRepo).mockClear();
+		vi.mocked(hub.datasetInfo).mockReset();
+		vi.mocked(hub.datasetInfo).mockResolvedValue({ private: true } as never);
 	});
 
 	afterEach(async () => {
@@ -74,34 +80,45 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 		expect(hub.commit).not.toHaveBeenCalled();
 	});
 
-	it("403s without a Hugging Face token", async () => {
+	it("403s a sign-in that cannot write to the Hub", async () => {
 		const { locals } = await createTestUser();
 		const conv = await createTestConversation(locals, { mlAssistant: true });
-		await expectStatus(push(locals, conv._id.toString(), { repo: "a/b" }), 403, "Sign in");
+		await expectStatus(push(locals, conv._id.toString(), { repo: "a/b" }), 403, "cannot write");
 	});
 
-	it("400s a repo that is not owner/name", async () => {
+	it.each(["nope", "../models", "a/..", "a/b..c", "../.."])("400s the repo %s", async (repo) => {
 		const { locals } = await signedIn();
 		const conv = await createTestConversation(locals, { mlAssistant: true });
-		await expectStatus(push(locals, conv._id.toString(), { repo: "nope" }), 400, "owner/name");
+		await expectStatus(push(locals, conv._id.toString(), { repo }), 400, "owner/name");
 	});
 
-	it("commits the trace under traces/ with the user token", async () => {
+	it.each([
+		"https://huggingface.co/datasets/alice/traces/",
+		"https://hf.co/datasets/alice/traces",
+		"datasets/alice/traces",
+		" alice/traces/ ",
+	])("reads the pasted repo %s as alice/traces", async (repo) => {
+		const { locals } = await signedIn();
+		const conv = await createTestConversation(locals, { mlAssistant: true });
+		const res = await push(locals, conv._id.toString(), { repo });
+		expect((await res.json()).repo).toBe("alice/traces");
+	});
+
+	it("commits the trace to traces/<id>.json with the user token", async () => {
 		const { locals } = await signedIn();
 		const conv = await createTestConversation(locals, {
 			mlAssistant: true,
 			title: "Fine-tune SmolLM",
 		});
-		const res = await push(locals, conv._id.toString(), {
-			repo: "https://huggingface.co/datasets/alice/ml-intern-traces",
-		});
+		const res = await push(locals, conv._id.toString(), { repo: "alice/ml-intern-traces" });
 
-		const path = `traces/${conv._id.toString()}-fine-tune-smollm.json`;
+		const path = `traces/${conv._id.toString()}.json`;
 		expect(await res.json()).toEqual({
 			repo: "alice/ml-intern-traces",
 			path,
 			url: `https://huggingface.co/datasets/alice/ml-intern-traces/blob/main/${path}`,
 			created: false,
+			private: true,
 		});
 		const call = vi.mocked(hub.commit).mock.calls[0][0];
 		expect(call).toMatchObject({
@@ -118,20 +135,49 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 		expect(hub.createRepo).not.toHaveBeenCalled();
 	});
 
-	it("creates a missing dataset private and pushes again", async () => {
+	it("keeps the same path after the conversation is renamed", async () => {
+		const { locals } = await signedIn();
+		const conv = await createTestConversation(locals, { mlAssistant: true, title: "New chat" });
+		await push(locals, conv._id.toString(), { repo: "alice/t" });
+		await collections.conversations.updateOne({ _id: conv._id }, { $set: { title: "Renamed" } });
+		await push(locals, conv._id.toString(), { repo: "alice/t" });
+
+		const paths = vi.mocked(hub.commit).mock.calls.map(([call]) => call.operations[0].path);
+		expect(paths).toEqual([
+			`traces/${conv._id.toString()}.json`,
+			`traces/${conv._id.toString()}.json`,
+		]);
+	});
+
+	it("asks before pushing to a public dataset", async () => {
 		const { locals } = await signedIn();
 		const conv = await createTestConversation(locals, { mlAssistant: true });
-		vi.mocked(hub.commit).mockRejectedValueOnce(hubError(404));
+		vi.mocked(hub.datasetInfo).mockResolvedValue({ private: false } as never);
+
+		const refused = await push(locals, conv._id.toString(), { repo: "alice/open" });
+		expect(refused.status).toBe(409);
+		expect(await refused.json()).toMatchObject({ code: "public-dataset" });
+		expect(hub.commit).not.toHaveBeenCalled();
+
+		const res = await push(locals, conv._id.toString(), { repo: "alice/open", allowPublic: true });
+		expect(await res.json()).toMatchObject({ private: false, created: false });
+		expect(hub.commit).toHaveBeenCalledTimes(1);
+	});
+
+	it("creates a missing dataset private before pushing", async () => {
+		const { locals } = await signedIn();
+		const conv = await createTestConversation(locals, { mlAssistant: true });
+		vi.mocked(hub.datasetInfo).mockRejectedValue(hubError(404));
 
 		const res = await push(locals, conv._id.toString(), { repo: "alice/new" });
 
-		expect((await res.json()).created).toBe(true);
+		expect(await res.json()).toMatchObject({ created: true, private: true });
 		expect(hub.createRepo).toHaveBeenCalledWith({
 			repo: { type: "dataset", name: "alice/new" },
 			accessToken: "hf_user",
 			private: true,
 		});
-		expect(hub.commit).toHaveBeenCalledTimes(2);
+		expect(hub.commit).toHaveBeenCalledTimes(1);
 	});
 
 	it("reports a token that cannot write as 403", async () => {
@@ -139,23 +185,31 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 		const conv = await createTestConversation(locals, { mlAssistant: true });
 		vi.mocked(hub.commit).mockRejectedValueOnce(hubError(403));
 
-		await expectStatus(
-			push(locals, conv._id.toString(), { repo: "org/locked" }),
-			403,
-			"cannot write to org/locked"
-		);
+		const res = await push(locals, conv._id.toString(), { repo: "org/locked" });
+		expect(res.status).toBe(403);
+		expect((await res.json()).message).toContain("only write to datasets it created");
 	});
 
 	it("reports an inaccessible private repo the Hub 404s then 409s as 403", async () => {
 		const { locals } = await signedIn();
 		const conv = await createTestConversation(locals, { mlAssistant: true });
-		vi.mocked(hub.commit).mockRejectedValueOnce(hubError(404));
+		vi.mocked(hub.datasetInfo).mockRejectedValue(hubError(404));
 		vi.mocked(hub.createRepo).mockRejectedValueOnce(hubError(409));
 
-		await expectStatus(
-			push(locals, conv._id.toString(), { repo: "bob/private" }),
-			403,
-			"cannot write"
+		const res = await push(locals, conv._id.toString(), { repo: "bob/private" });
+		expect(res.status).toBe(403);
+		expect(hub.commit).not.toHaveBeenCalled();
+	});
+
+	it("keeps a network error's details off the client", async () => {
+		const { locals } = await signedIn();
+		const conv = await createTestConversation(locals, { mlAssistant: true });
+		vi.mocked(hub.commit).mockRejectedValueOnce(
+			new TypeError("fetch failed: connect ECONNREFUSED 10.0.0.12:443")
 		);
+
+		const res = await push(locals, conv._id.toString(), { repo: "alice/t" });
+		expect(res.status).toBe(502);
+		expect(JSON.stringify(await res.json())).not.toContain("10.0.0.12");
 	});
 });

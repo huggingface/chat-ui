@@ -26,3 +26,10 @@ export function getUserHubToken(locals: App.Locals | undefined): string | undefi
 		return undefined;
 	}
 }
+
+/** writing needs contribute-repos, which lets the app create repos and update only the ones it created */
+export function getUserHubWriteToken(locals: App.Locals | undefined): string | undefined {
+	const token = getUserHubToken(locals);
+	if (!token || config.USE_USER_TOKEN === "true") return token;
+	return (config.OPENID_SCOPES ?? "").split(/\s+/).includes("contribute-repos") ? token : undefined;
+}
