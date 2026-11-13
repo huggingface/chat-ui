@@ -7,6 +7,10 @@ import type { User } from "$lib/types/User";
 import { slackConfig, type SlackConfig } from "./config";
 
 /** Separate application identity: Slack tasks never appear in the token owner's private chats. */
+/** the shared account legacy threads run under */
+export const sharedAccountId = (teamId: string) =>
+	new ObjectId(createHash("sha256").update(`slack-ml:${teamId}`).digest("hex").slice(0, 24));
+
 export async function provisionSlackIdentity(settings: SlackConfig): Promise<User> {
 	const response = await fetch("https://huggingface.co/api/whoami-v2", {
 		headers: { Authorization: `Bearer ${settings.hfToken}` },
@@ -16,9 +20,7 @@ export async function provisionSlackIdentity(settings: SlackConfig): Promise<Use
 	const account = z.object({ name: z.string().min(1) }).parse(await response.json());
 	const now = new Date();
 	const user: User = {
-		_id: new ObjectId(
-			createHash("sha256").update(`slack-ml:${settings.teamId}`).digest("hex").slice(0, 24)
-		),
+		_id: sharedAccountId(settings.teamId),
 		hfUserId: `slack-ml:${settings.teamId}`,
 		slackBotTeamId: settings.teamId,
 		username: account.name,

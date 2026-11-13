@@ -3,7 +3,8 @@ import { isTurnAlive, type TurnLiveness } from "$lib/server/generation/turnLog";
 import { hasQueuedInputs } from "$lib/server/queuedInputs/store";
 import type { McpElicitation, PendingKind } from "$lib/types/McpElicitation";
 import type { User } from "$lib/types/User";
-import type { RunId, RunMessage, RunQuestion, RunStatus, RunTurn } from "./types";
+import { ownerFilter, owns } from "./owner";
+import type { RunMessage, RunQuestion, RunRef, RunStatus, RunTurn } from "./types";
 
 export function toRunQuestion(row: McpElicitation): RunQuestion {
 	return {
@@ -18,11 +19,7 @@ export function toRunQuestion(row: McpElicitation): RunQuestion {
 	};
 }
 
-export async function runExists(conversationId: RunId): Promise<boolean> {
-	return (
-		(await collections.conversations.countDocuments({ _id: conversationId }, { limit: 1 })) > 0
-	);
-}
+export { owns as runExists };
 
 export async function findRunOwner(userId: User["_id"]): Promise<User | null> {
 	return collections.users.findOne({ _id: userId });
@@ -34,12 +31,13 @@ export async function ownerUsername(userId: User["_id"]): Promise<string | undef
 }
 
 export async function findQuestion(
-	conversationId: RunId,
+	run: RunRef,
 	elicitationId: string,
 	filter: { pending?: boolean; kind?: PendingKind } = {}
 ): Promise<RunQuestion | undefined> {
+	if (!(await owns(run))) return;
 	const row = await collections.mcpElicitations.findOne({
-		conversationId,
+		conversationId: run.conversationId,
 		elicitationId,
 		...(filter.pending ? { status: "pending" as const } : {}),
 		...(filter.kind ? { "pending.kind": filter.kind } : {}),
@@ -47,30 +45,30 @@ export async function findQuestion(
 	return row ? toRunQuestion(row) : undefined;
 }
 
-export async function readLatestMessage(conversationId: RunId): Promise<RunMessage | undefined> {
-	const conv = await collections.conversations.findOne(
-		{ _id: conversationId },
-		{ projection: { messages: { $slice: -1 } } }
-	);
+export async function readLatestMessage(run: RunRef): Promise<RunMessage | undefined> {
+	const conv = await collections.conversations.findOne(ownerFilter(run), {
+		projection: { messages: { $slice: -1 } },
+	});
 	return conv?.messages.at(-1);
 }
 
 /** the newest message, with liveness only for an assistant message */
 export async function readLatest(
-	conversationId: RunId
+	run: RunRef
 ): Promise<{ message?: RunMessage; live?: TurnLiveness }> {
-	const message = await readLatestMessage(conversationId);
+	const message = await readLatestMessage(run);
 	if (message?.from !== "assistant") return { message };
-	return { message, live: await isTurnAlive(conversationId, message.id) };
+	return { message, live: await isTurnAlive(run.conversationId, message.id) };
 }
 
 /** the newest turn on this generation, dead and interrupted or failed */
 export async function canRetry(
-	conversationId: RunId,
+	run: RunRef,
 	messageId: string,
 	generationId: string | undefined
 ): Promise<boolean> {
-	const last = await readLatestMessage(conversationId);
+	const { conversationId } = run;
+	const last = await readLatestMessage(run);
 	if (
 		!last ||
 		last.id !== messageId ||
@@ -83,16 +81,20 @@ export async function canRetry(
 }
 
 /** nothing producing, parked or queued, so a client can stop watching */
-export async function isRunSettled(conversationId: RunId): Promise<boolean> {
-	const message = await readLatestMessage(conversationId);
-	if (message && (await isTurnAlive(conversationId, message.id)).alive) return false;
-	return !(await hasQueuedInputs(conversationId));
+export async function isRunSettled(run: RunRef): Promise<boolean> {
+	if (!(await owns(run))) return true;
+	const message = await readLatestMessage(run);
+	if (message && (await isTurnAlive(run.conversationId, message.id)).alive) return false;
+	return !(await hasQueuedInputs(run.conversationId));
 }
 
-export { hasQueuedInputs as hasPendingSteers };
+export async function hasPendingSteers(run: RunRef): Promise<boolean> {
+	return (await owns(run)) && (await hasQueuedInputs(run.conversationId));
+}
 
-export async function readTurn(conversationId: RunId): Promise<RunTurn | undefined> {
-	const message = await readLatestMessage(conversationId);
+export async function readTurn(run: RunRef): Promise<RunTurn | undefined> {
+	const { conversationId } = run;
+	const message = await readLatestMessage(run);
 	if (message?.from !== "assistant") return;
 	const state = await collections.turnStates.findOne({ conversationId, messageId: message.id });
 	if (!state) return;
@@ -139,20 +141,17 @@ export async function readTurn(conversationId: RunId): Promise<RunTurn | undefin
 	};
 }
 
-export async function readRunStatus(conversationId: RunId): Promise<RunStatus | undefined> {
-	const conv = await collections.conversations.findOne(
-		{ _id: conversationId },
-		{
-			projection: {
-				"messages.id": 1,
-				"messages.from": 1,
-				"messages.queuedContinuationOf": 1,
-				"messages.createdAt": 1,
-				mlBudget: 1,
-				plan: 1,
-			},
-		}
-	);
+export async function readRunStatus(run: RunRef): Promise<RunStatus | undefined> {
+	const conv = await collections.conversations.findOne(ownerFilter(run), {
+		projection: {
+			"messages.id": 1,
+			"messages.from": 1,
+			"messages.queuedContinuationOf": 1,
+			"messages.createdAt": 1,
+			mlBudget: 1,
+			plan: 1,
+		},
+	});
 	const message = conv?.messages.at(-1);
 	if (!conv || message?.from !== "assistant") return;
 	const cardMessageId = message.queuedContinuationOf ?? message.id;
@@ -162,18 +161,20 @@ export async function readRunStatus(conversationId: RunId): Promise<RunStatus | 
 	return { messageId: message.id, cardMessageId, budget: conv.mlBudget, plan };
 }
 
-export async function supersededQuestions(conversationId: RunId): Promise<RunQuestion[]> {
+export async function supersededQuestions(run: RunRef): Promise<RunQuestion[]> {
+	if (!(await owns(run))) return [];
 	const rows = await collections.mcpElicitations
-		.find({ conversationId, slackSkippedByInputId: { $exists: true } })
+		.find({ conversationId: run.conversationId, slackSkippedByInputId: { $exists: true } })
 		.toArray();
 	return rows.map(toRunQuestion);
 }
 
 /** answers a client asked to echo, once the user gave them */
-export async function sharedAnswers(conversationId: RunId): Promise<RunQuestion[]> {
+export async function sharedAnswers(run: RunRef): Promise<RunQuestion[]> {
+	if (!(await owns(run))) return [];
 	const rows = await collections.mcpElicitations
 		.find({
-			conversationId,
+			conversationId: run.conversationId,
 			status: "resolved",
 			action: "accept",
 			resolution: "user",
@@ -185,12 +186,11 @@ export async function sharedAnswers(conversationId: RunId): Promise<RunQuestion[
 }
 
 export async function exportTrace(
-	conversationId: RunId
+	run: RunRef
 ): Promise<{ filename: string; content: string } | undefined> {
-	const conv = await collections.conversations.findOne(
-		{ _id: conversationId },
-		{ projection: { messages: 1 } }
-	);
+	const conv = await collections.conversations.findOne(ownerFilter(run), {
+		projection: { messages: 1 },
+	});
 	if (!conv) return;
 	return {
 		filename: `ml-intern-${conv._id}.jsonl`,

@@ -17,6 +17,11 @@ import {
 	supersedeQuestion,
 	supersededQuestions,
 	findQuestion,
+	answerQuestion,
+	discardRunSession,
+	exportTrace,
+	RunNotFoundError,
+	steerRun,
 } from ".";
 
 vi.mock("$lib/utils/mlAssistantFlag", () => ({ ML_ASSISTANT_MODE: true }));
@@ -26,6 +31,8 @@ beforeAll(async () => {
 });
 
 const ids: ObjectId[] = [];
+const owner = new ObjectId();
+const ref = (conversationId: ObjectId) => ({ conversationId, ownerId: owner });
 
 afterEach(async () => {
 	const filter = { conversationId: { $in: ids } };
@@ -59,6 +66,7 @@ async function seed(messages: Message[], extra: Record<string, unknown> = {}): P
 	ids.push(_id);
 	await collections.conversations.insertOne({
 		_id,
+		userId: owner,
 		model: "m",
 		title: "t",
 		messages,
@@ -107,19 +115,45 @@ const park = (conversationId: ObjectId, messageId: string) =>
 		updatedAt: at(1),
 	} as never);
 
+describe("ownership", () => {
+	it("refuses every read and write for an owner the run does not belong to", async () => {
+		const id = await seed([message("a1", "assistant")]);
+		await turnState(id, "a1", "awaiting_input");
+		await question(id, { elicitationId: "q1" });
+		const stranger = { conversationId: id, ownerId: new ObjectId() };
+
+		expect(await readTurn(stranger)).toBeUndefined();
+		expect(await findQuestion(stranger, "q1")).toBeUndefined();
+		expect(await exportTrace(stranger)).toBeUndefined();
+		await stageChoice(stranger, "q1", 0, 1);
+		expect(await lockChoices(stranger, "q1", 1)).toBe(false);
+		expect(
+			await answerQuestion(stranger, { elicitationId: "q1", action: "accept", content: {} })
+		).toMatchObject({ ok: false, status: 404 });
+		await expect(steerRun({ run: stranger, text: "hi", source: "slack" })).rejects.toBeInstanceOf(
+			RunNotFoundError
+		);
+		await discardRunSession(stranger);
+
+		expect((await findQuestion(ref(id), "q1", { pending: true }))?.choices).toBeUndefined();
+		expect(await collections.queuedInputs.countDocuments({ conversationId: id })).toBe(0);
+		expect(await collections.conversations.countDocuments({ _id: id })).toBe(1);
+	});
+});
+
 describe("readTurn", () => {
 	it("returns nothing until the assistant has a turn state", async () => {
 		const id = await seed([message("u1", "user")]);
-		expect(await readTurn(id)).toBeUndefined();
+		expect(await readTurn(ref(id))).toBeUndefined();
 		const started = await seed([message("a1", "assistant")]);
-		expect(await readTurn(started)).toBeUndefined();
+		expect(await readTurn(ref(started))).toBeUndefined();
 	});
 
 	it("reports a turn superseded by a new request before anything else", async () => {
 		const id = await seed([message("a1", "assistant")]);
 		await turnState(id, "a1");
 		await question(id, { elicitationId: "q1", status: "resolved", slackSkippedByInputId: "i1" });
-		expect(await readTurn(id)).toMatchObject({ kind: "superseded", message: { id: "a1" } });
+		expect(await readTurn(ref(id))).toMatchObject({ kind: "superseded", message: { id: "a1" } });
 	});
 
 	it("maps the pending question, its staged choices and the newest shared answer", async () => {
@@ -133,7 +167,7 @@ describe("readTurn", () => {
 			slackShareAnswer: true,
 			content: { a: "x" },
 		});
-		const turn = await readTurn(id);
+		const turn = await readTurn(ref(id));
 		if (turn?.kind !== "turn") throw new Error("expected a turn");
 		expect(turn.question).toMatchObject({
 			elicitationId: "q1",
@@ -153,7 +187,7 @@ describe("readTurn", () => {
 			message("a1", "assistant", { createdAt: at(9), queuedContinuationOf: "a0" }),
 		]);
 		await turnState(id, "a1");
-		const turn = await readTurn(id);
+		const turn = await readTurn(ref(id));
 		expect(turn?.kind === "turn" && turn.startedAt).toEqual(at(5));
 	});
 });
@@ -169,7 +203,7 @@ describe("readRunStatus", () => {
 			],
 			{ plan: plan(at(4)) }
 		);
-		expect(await readRunStatus(stale)).toMatchObject({
+		expect(await readRunStatus(ref(stale))).toMatchObject({
 			messageId: "a1",
 			cardMessageId: "a0",
 			plan: null,
@@ -177,7 +211,7 @@ describe("readRunStatus", () => {
 		const fresh = await seed([message("a0", "assistant", { createdAt: at(5) })], {
 			plan: plan(at(6)),
 		});
-		expect((await readRunStatus(fresh))?.plan?.updatedAt).toEqual(at(6));
+		expect((await readRunStatus(ref(fresh)))?.plan?.updatedAt).toEqual(at(6));
 	});
 });
 
@@ -185,37 +219,42 @@ describe("question choices", () => {
 	it("stages, locks once per revision, and releases", async () => {
 		const id = await seed([message("a1", "assistant")]);
 		await question(id, { elicitationId: "q1" });
-		await stageChoice(id, "q1", 0, 1);
-		await stageChoice(id, "q1", 1, 0);
-		expect(await findQuestion(id, "q1")).toMatchObject({
+		await stageChoice(ref(id), "q1", 0, 1);
+		await stageChoice(ref(id), "q1", 1, 0);
+		expect(await findQuestion(ref(id), "q1")).toMatchObject({
 			choices: { 0: 1, 1: 0 },
 			choiceRevision: 2,
 		});
-		expect(await lockChoices(id, "q1", 1)).toBe(false);
-		expect(await lockChoices(id, "q1", 2)).toBe(true);
-		expect(await lockChoices(id, "q1", 2)).toBe(false);
-		await stageChoice(id, "q1", 0, 3);
-		expect((await findQuestion(id, "q1"))?.choices).toEqual({ 0: 1, 1: 0 });
-		await releaseChoices(id, "q1");
-		expect(await lockChoices(id, "q1", 2)).toBe(true);
+		expect(await lockChoices(ref(id), "q1", 1)).toBe(false);
+		expect(await lockChoices(ref(id), "q1", 2)).toBe(true);
+		expect(await lockChoices(ref(id), "q1", 2)).toBe(false);
+		await stageChoice(ref(id), "q1", 0, 3);
+		expect((await findQuestion(ref(id), "q1"))?.choices).toEqual({ 0: 1, 1: 0 });
+		await releaseChoices(ref(id), "q1");
+		expect(await lockChoices(ref(id), "q1", 2)).toBe(true);
 	});
 
 	it("only lists answers a client shared once the user accepted them", async () => {
 		const id = await seed([message("a1", "assistant")]);
 		await question(id, { elicitationId: "q1" });
-		await shareAnswer(id, "q1");
-		expect(await sharedAnswers(id)).toEqual([]);
+		await shareAnswer(ref(id), "q1");
+		expect(await sharedAnswers(ref(id))).toEqual([]);
 		await collections.mcpElicitations.updateOne(
 			{ conversationId: id, elicitationId: "q1" },
 			{ $set: { status: "resolved", action: "accept", resolution: "user" } }
 		);
-		expect((await sharedAnswers(id)).map((q) => q.elicitationId)).toEqual(["q1"]);
+		expect((await sharedAnswers(ref(id))).map((q) => q.elicitationId)).toEqual(["q1"]);
 	});
 });
 
 describe("supersedeQuestion", () => {
 	const supersede = (conversationId: ObjectId, inputId = "i1") =>
-		supersedeQuestion({ conversationId, messageId: "a1", inputId, reason: "new request" });
+		supersedeQuestion({
+			run: ref(conversationId),
+			messageId: "a1",
+			inputId,
+			reason: "new request",
+		});
 
 	it("resolves a pending ask once, and repeats the outcome for the same input", async () => {
 		const id = await seed([message("a1", "assistant")]);
@@ -223,8 +262,8 @@ describe("supersedeQuestion", () => {
 		expect(await supersede(id)).toBe("superseded");
 		expect(await supersede(id)).toBe("superseded");
 		expect(await supersede(id, "i2")).toBe("none");
-		expect(await supersededQuestions(id)).toHaveLength(1);
-		expect(await findQuestion(id, "q1")).toMatchObject({ kind: "ask" });
+		expect(await supersededQuestions(ref(id))).toHaveLength(1);
+		expect(await findQuestion(ref(id), "q1")).toMatchObject({ kind: "ask" });
 	});
 
 	it("never supersedes answers being submitted, and lets reviews through", async () => {
@@ -244,7 +283,7 @@ describe("supersedeQuestion", () => {
 describe("run liveness", () => {
 	it("is settled only with nothing parked or queued", async () => {
 		const id = await seed([message("a1", "assistant")]);
-		expect(await isRunSettled(id)).toBe(true);
+		expect(await isRunSettled(ref(id))).toBe(true);
 		await collections.queuedInputs.insertOne({
 			_id: new ObjectId(),
 			conversationId: id,
@@ -254,21 +293,21 @@ describe("run liveness", () => {
 			createdAt: at(1),
 			updatedAt: at(1),
 		});
-		expect(await isRunSettled(id)).toBe(false);
+		expect(await isRunSettled(ref(id))).toBe(false);
 		await collections.queuedInputs.deleteMany({ conversationId: id });
 		await park(id, "a1");
-		expect(await isRunSettled(id)).toBe(false);
+		expect(await isRunSettled(ref(id))).toBe(false);
 	});
 
 	it("retries only the newest dead turn that failed or was interrupted", async () => {
 		const id = await seed([message("a1", "assistant", { generationId: "g1" })]);
 		await turnState(id, "a1", "done");
-		expect(await canRetry(id, "a1", "g1")).toBe(false);
+		expect(await canRetry(ref(id), "a1", "g1")).toBe(false);
 		await collections.turnStates.updateOne({ conversationId: id }, { $set: { status: "failed" } });
-		expect(await canRetry(id, "a1", "g0")).toBe(false);
-		expect(await canRetry(id, "a1", "g1")).toBe(true);
+		expect(await canRetry(ref(id), "a1", "g0")).toBe(false);
+		expect(await canRetry(ref(id), "a1", "g1")).toBe(true);
 		await park(id, "a1");
-		expect(await canRetry(id, "a1", "g1")).toBe(false);
+		expect(await canRetry(ref(id), "a1", "g1")).toBe(false);
 	});
 });
 

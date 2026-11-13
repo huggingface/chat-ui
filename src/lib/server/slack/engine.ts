@@ -47,7 +47,7 @@ export async function ensureConversation(
 	});
 	// Deletion can race initial creation. Never leave a resurrected history entry.
 	if ((await collections.slackThreads.findOne({ _id: thread._id }))?.deletedAt) {
-		await discardRunSession(thread.conversationId);
+		await discardRunSession({ conversationId: thread.conversationId, ownerId: user._id });
 		throw new Error("This Slack conversation was deleted. Start a new Slack thread.");
 	}
 }
@@ -90,7 +90,7 @@ export async function skipSlackQuestion(
 	inputId: string
 ): Promise<boolean> {
 	const outcome = await supersedeQuestion({
-		conversationId: thread.conversationId,
+		run: { conversationId: thread.conversationId, ownerId: user._id },
 		messageId,
 		inputId,
 		reason: "Continued with a new Slack message",

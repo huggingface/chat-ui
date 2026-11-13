@@ -1,7 +1,23 @@
 import { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 
-export { answerSideQuestion, SIDE_QUESTION_MAX_CHARS } from "$lib/server/mlSideQuestion";
+import { answerSideQuestion as answer, SideQuestionError } from "$lib/server/mlSideQuestion";
+import { owns } from "./owner";
+import type { RunRef } from "./types";
+
+export { SIDE_QUESTION_MAX_CHARS } from "$lib/server/mlSideQuestion";
+
+export async function* answerSideQuestion({
+	run,
+	...opts
+}: Omit<Parameters<typeof answer>[0], "conversationId"> & { run: RunRef }): AsyncGenerator<
+	string,
+	void,
+	void
+> {
+	if (!(await owns(run))) throw new SideQuestionError("not_found", "Conversation not found");
+	yield* answer({ ...opts, conversationId: run.conversationId });
+}
 
 /** rows go in before counting, so racing requests may both back off but never both take the last slot */
 export async function reserveSideQuestionQuota(

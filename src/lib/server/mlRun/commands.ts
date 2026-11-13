@@ -12,12 +12,30 @@ import { usdToMicroUsd } from "$lib/utils/mlBudget";
 import type { Conversation, ManagedBy } from "$lib/types/Conversation";
 import type { QueuedInput } from "$lib/types/QueuedInput";
 import type { User } from "$lib/types/User";
-import type { RunId, TurnInput } from "./types";
+import { submitElicitationAnswer, type SubmitResult } from "$lib/server/mcp/elicitation";
+import { kickAnsweredAsk } from "$lib/server/generation/askResume";
+import { assertOwns, ownerFilter, owns } from "./owner";
+import type { RunId, RunRef, TurnInput } from "./types";
 
-export { submitElicitationAnswer as answerQuestion } from "$lib/server/mcp/elicitation";
-/** the harness continues an answered assistant question itself, with no new request */
-export { kickAnsweredAsk as continueAnsweredAsk } from "$lib/server/generation/askResume";
 export { QueueFullError, QueuedInputTooLongError } from "$lib/server/queuedInputs/store";
+export { RunNotFoundError } from "./owner";
+
+export async function answerQuestion(
+	run: RunRef,
+	answer: Omit<Parameters<typeof submitElicitationAnswer>[0], "conversationId">
+): Promise<SubmitResult> {
+	if (!(await owns(run))) return { ok: false, status: 404, error: "Unknown elicitation." };
+	return submitElicitationAnswer({ ...answer, conversationId: run.conversationId });
+}
+
+/** the harness continues an answered assistant question itself, with no new request */
+export async function continueAnsweredAsk(
+	run: RunRef,
+	elicitationId: string
+): ReturnType<typeof kickAnsweredAsk> {
+	if (!(await owns(run))) return "failed";
+	return kickAnsweredAsk(run.conversationId, elicitationId);
+}
 
 /** an existing session is left as it is */
 export async function openRunSession(opts: {
@@ -63,14 +81,14 @@ export async function openRunSession(opts: {
 	);
 }
 
-export async function discardRunSession(conversationId: RunId): Promise<void> {
-	await collections.conversations.deleteOne({ _id: conversationId });
+export async function discardRunSession(run: RunRef): Promise<void> {
+	await collections.conversations.deleteOne(ownerFilter(run));
 }
 
 /** for sessions created before managedBy was stored */
-export async function backfillManagedBy(conversationId: RunId, managedBy: ManagedBy) {
+export async function backfillManagedBy(run: RunRef, managedBy: ManagedBy) {
 	await collections.conversations.updateOne(
-		{ _id: conversationId, managedBy: { $exists: false } },
+		{ ...ownerFilter(run), managedBy: { $exists: false } },
 		{ $set: { managedBy } }
 	);
 }
@@ -186,12 +204,14 @@ export async function stopRun(opts: {
  * caller must stop the run, review means the new turn may go ahead
  */
 export async function supersedeQuestion(opts: {
-	conversationId: RunId;
+	run: RunRef;
 	messageId: string;
 	inputId: string;
 	reason: string;
 }): Promise<"superseded" | "review" | "none"> {
-	const { conversationId, messageId, inputId } = opts;
+	const { run, messageId, inputId } = opts;
+	await assertOwns(run);
+	const { conversationId } = run;
 	const now = new Date();
 	const result = await collections.mcpElicitations.findOneAndUpdate(
 		{
@@ -234,38 +254,55 @@ export async function supersedeQuestion(opts: {
 
 /** joins the busy turn at its next step, or starts the next turn */
 export async function steerRun(opts: {
-	conversationId: RunId;
+	run: RunRef;
 	text: string;
 	source: QueuedInput["source"];
-	userId: User["_id"];
 	sessionId?: string;
+	/** runs once the message is queued and before the turn can pick it up */
+	onQueued?: () => Promise<void>;
 }): Promise<void> {
-	await enqueueInput(opts);
-	await wakeParkForQueuedInput(opts.conversationId);
-	kickQueuedTurn(opts.conversationId);
+	const { run } = opts;
+	await assertOwns(run);
+	await enqueueInput({
+		conversationId: run.conversationId,
+		userId: run.ownerId,
+		text: opts.text,
+		source: opts.source,
+		...(opts.sessionId ? { sessionId: opts.sessionId } : {}),
+	});
+	await opts.onQueued?.();
+	await wakeParkForQueuedInput(run.conversationId);
+	kickQueuedTurn(run.conversationId);
 }
 
 export async function stageChoice(
-	conversationId: RunId,
+	run: RunRef,
 	elicitationId: string,
 	fieldIndex: number,
 	optionIndex: number
 ): Promise<void> {
+	if (!(await owns(run))) return;
 	await collections.mcpElicitations.updateOne(
-		{ conversationId, elicitationId, status: "pending", slackSubmitting: { $ne: true } },
+		{
+			conversationId: run.conversationId,
+			elicitationId,
+			status: "pending",
+			slackSubmitting: { $ne: true },
+		},
 		{ $set: { [`slackChoices.${fieldIndex}`]: optionIndex }, $inc: { slackChoiceRevision: 1 } }
 	);
 }
 
 /** false when the choices changed or are already being submitted */
 export async function lockChoices(
-	conversationId: RunId,
+	run: RunRef,
 	elicitationId: string,
 	revision: number
 ): Promise<boolean> {
+	if (!(await owns(run))) return false;
 	const locked = await collections.mcpElicitations.updateOne(
 		{
-			conversationId,
+			conversationId: run.conversationId,
 			elicitationId,
 			status: "pending",
 			slackChoiceRevision: revision,
@@ -276,17 +313,19 @@ export async function lockChoices(
 	return locked.modifiedCount > 0;
 }
 
-export async function releaseChoices(conversationId: RunId, elicitationId: string) {
+export async function releaseChoices(run: RunRef, elicitationId: string) {
+	if (!(await owns(run))) return;
 	await collections.mcpElicitations.updateOne(
-		{ conversationId, elicitationId },
+		{ conversationId: run.conversationId, elicitationId },
 		{ $unset: { slackSubmitting: "" } }
 	);
 }
 
 /** the client echoes this answer once accepted */
-export async function shareAnswer(conversationId: RunId, elicitationId: string) {
+export async function shareAnswer(run: RunRef, elicitationId: string) {
+	if (!(await owns(run))) return;
 	await collections.mcpElicitations.updateOne(
-		{ conversationId, elicitationId, status: "pending" },
+		{ conversationId: run.conversationId, elicitationId, status: "pending" },
 		{ $set: { slackShareAnswer: true } }
 	);
 }

@@ -52,11 +52,12 @@ import {
 	stageChoice,
 	steerRun,
 	supersededQuestions,
+	type RunRef,
 } from "$lib/server/mlRun";
 import { reservedMicroUsd, formatMicroUsd } from "$lib/utils/mlBudget";
 import type { User } from "$lib/types/User";
 import { slackConfig, type SlackConfig } from "./config";
-import { provisionSlackIdentity, threadLocals } from "./identity";
+import { provisionSlackIdentity, sharedAccountId, threadLocals } from "./identity";
 import { slackSideQuestion } from "$lib/utils/sideQuestion";
 import {
 	ensureConversation,
@@ -137,6 +138,11 @@ const SLACK_SIDE_QUESTION_TIMEOUT_MS = 90_000;
 /** concurrent runs per worker, and per Slack workspace */
 const MAX_RUNS = 8;
 const MAX_WORKSPACE_RUNS = 4;
+
+const runOf = (thread: SlackThread, sharedAccount: User["_id"]): RunRef => ({
+	conversationId: thread.conversationId,
+	ownerId: thread.hfUserId ?? sharedAccount,
+});
 
 const conversationLink = (conversationId: ObjectId) =>
 	`${config.PUBLIC_ORIGIN}${base}/conversation/${conversationId.toString()}`;
@@ -287,6 +293,10 @@ export class MlSlackBot {
 		});
 	}
 
+	private runOf(thread: SlackThread): RunRef {
+		return runOf(thread, this.user?._id ?? sharedAccountId(this.settings.teamId));
+	}
+
 	private async owned(
 		threadId: string,
 		userId: string,
@@ -362,7 +372,7 @@ export class MlSlackBot {
 					if (!parsed.success) return;
 					const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
 					if (!thread) return;
-					const question = await findQuestion(thread.conversationId, parsed.data.elicitationId, {
+					const question = await findQuestion(this.runOf(thread), parsed.data.elicitationId, {
 						pending: true,
 						kind: "ask",
 					});
@@ -370,7 +380,7 @@ export class MlSlackBot {
 					const field = question.request.fields?.[parsed.data.fieldIndex];
 					if (field?.kind !== "select" || !field.options[parsed.data.optionIndex]) return;
 					await stageChoice(
-						thread.conversationId,
+						this.runOf(thread),
 						question.elicitationId,
 						parsed.data.fieldIndex,
 						parsed.data.optionIndex
@@ -392,15 +402,13 @@ export class MlSlackBot {
 			if (!parsed.success) return;
 			const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
 			if (!thread) return;
-			const question = await findQuestion(thread.conversationId, parsed.data.elicitationId, {
+			const question = await findQuestion(this.runOf(thread), parsed.data.elicitationId, {
 				pending: true,
 				kind: "ask",
 			});
 			const content = question && selectedAnswers(question.request, question.choices);
 			if (!question || !content || question.choiceRevision !== parsed.data.revision) return;
-			if (
-				!(await lockChoices(thread.conversationId, question.elicitationId, parsed.data.revision))
-			) {
+			if (!(await lockChoices(this.runOf(thread), question.elicitationId, parsed.data.revision))) {
 				await this.tell(
 					thread.teamId,
 					thread.channel,
@@ -410,8 +418,7 @@ export class MlSlackBot {
 				return;
 			}
 			try {
-				const result = await answerQuestion({
-					conversationId: thread.conversationId,
+				const result = await answerQuestion(this.runOf(thread), {
 					elicitationId: question.elicitationId,
 					action: "accept",
 					content,
@@ -426,7 +433,7 @@ export class MlSlackBot {
 						resumeElicitationId: question.elicitationId,
 					});
 			} finally {
-				await releaseChoices(thread.conversationId, question.elicitationId);
+				await releaseChoices(this.runOf(thread), question.elicitationId);
 				await collections.slackThreads.updateOne({ _id: thread._id }, { $set: { watching: true } });
 			}
 		});
@@ -440,16 +447,15 @@ export class MlSlackBot {
 				if (!parsed.success) return;
 				const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
 				if (!thread) return;
-				const question = await findQuestion(thread.conversationId, parsed.data.elicitationId, {
+				const question = await findQuestion(this.runOf(thread), parsed.data.elicitationId, {
 					pending: true,
 					kind: "ask",
 				});
 				const field = question && inlineField(question.request);
 				const option = field && field.options[parsed.data.optionIndex];
 				if (!question || !field || !option) return;
-				await shareAnswer(thread.conversationId, question.elicitationId);
-				const result = await answerQuestion({
-					conversationId: thread.conversationId,
+				await shareAnswer(this.runOf(thread), question.elicitationId);
+				const result = await answerQuestion(this.runOf(thread), {
 					elicitationId: question.elicitationId,
 					action: "accept",
 					content: { [field.name]: option.value },
@@ -484,7 +490,7 @@ export class MlSlackBot {
 			if (!parsed.success) return;
 			const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
 			if (!thread) return;
-			const question = await findQuestion(thread.conversationId, parsed.data.elicitationId, {
+			const question = await findQuestion(this.runOf(thread), parsed.data.elicitationId, {
 				pending: true,
 			});
 			if (question?.kind === "review") {
@@ -522,7 +528,7 @@ export class MlSlackBot {
 				await ack({ response_action: "clear" });
 				return;
 			}
-			const question = await findQuestion(thread.conversationId, parsed.data.elicitationId);
+			const question = await findQuestion(this.runOf(thread), parsed.data.elicitationId);
 			if (!question) {
 				await ack({ response_action: "clear" });
 				return;
@@ -532,10 +538,9 @@ export class MlSlackBot {
 				await ack({ response_action: "errors", errors: answer.errors });
 				return;
 			}
-			if (question.kind === "ask") await shareAnswer(thread.conversationId, question.elicitationId);
+			if (question.kind === "ask") await shareAnswer(this.runOf(thread), question.elicitationId);
 
-			const result = await answerQuestion({
-				conversationId: thread.conversationId,
+			const result = await answerQuestion(this.runOf(thread), {
 				elicitationId: question.elicitationId,
 				action: "accept",
 				content: answer.content,
@@ -570,7 +575,7 @@ export class MlSlackBot {
 			if (!parsed.success) return;
 			const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id, false);
 			if (!thread) return;
-			if ((await readLatestMessage(thread.conversationId))?.id !== parsed.data.messageId) return;
+			if ((await readLatestMessage(this.runOf(thread)))?.id !== parsed.data.messageId) return;
 			const owner = thread.hfUserId ? await findRunOwner(thread.hfUserId) : this.user;
 			if (!owner) return;
 			await stopSlackTurn(thread, owner);
@@ -590,7 +595,7 @@ export class MlSlackBot {
 			const thread = await this.owned(parsed.data.threadId, body.user.id, body.team?.id);
 			if (!thread) return;
 			const { messageId, generationId } = parsed.data;
-			if (!(await canRetry(thread.conversationId, messageId, generationId))) return;
+			if (!(await canRetry(this.runOf(thread), messageId, generationId))) return;
 			await enqueueInput({
 				_id: inputKey(thread.teamId, `retry:${thread._id}:${generationId}`),
 				threadId: thread._id,
@@ -627,7 +632,7 @@ export class MlSlackBot {
 				return;
 			const channel = await workspace.client.conversations.info({ channel: thread.channel });
 			if (channel.channel?.is_ext_shared && !thread.hfUserId) return;
-			const trace = await exportTrace(thread.conversationId);
+			const trace = await exportTrace(this.runOf(thread));
 			if (!trace) return;
 			try {
 				// Personal traces include private tool results: deliver only to the owner DM.
@@ -894,7 +899,7 @@ export class MlSlackBot {
 			_id: threadKey(teamId, event.channel, event.thread_ts ?? event.ts),
 			teamId,
 		});
-		if (!thread || !(await runExists(thread.conversationId))) return false;
+		if (!thread || !(await runExists(this.runOf(thread)))) return false;
 
 		const now = Date.now();
 		for (const [id, until] of this.sideQuestionEvents)
@@ -929,7 +934,7 @@ export class MlSlackBot {
 				.catch(() => {});
 			let answer = "";
 			for await (const chunk of answerSideQuestion({
-				conversationId: thread.conversationId,
+				run: this.runOf(thread),
 				question,
 				locals: await threadLocals(thread, this.user),
 				signal: AbortSignal.timeout(SLACK_SIDE_QUESTION_TIMEOUT_MS),
@@ -1051,9 +1056,9 @@ export class MlSlackBot {
 			const noteMcpUnavailable = () =>
 				this.tell(thread.teamId, thread.channel, thread.owner, MCP_RESYNC_NOTE, thread.threadTs);
 			if (input.resumeElicitationId) {
-				const question = await findQuestion(thread.conversationId, input.resumeElicitationId);
+				const question = await findQuestion(this.runOf(thread), input.resumeElicitationId);
 				if (question?.kind === "ask")
-					await continueAnsweredAsk(thread.conversationId, input.resumeElicitationId);
+					await continueAnsweredAsk(this.runOf(thread), input.resumeElicitationId);
 				else
 					await runSlackTurn(
 						thread,
@@ -1063,7 +1068,7 @@ export class MlSlackBot {
 						noteMcpUnavailable
 					);
 			} else {
-				const { message: latest, live } = await readLatest(thread.conversationId);
+				const { message: latest, live } = await readLatest(this.runOf(thread));
 				if (
 					input.retry &&
 					(latest?.id !== input.expectedMessageId ||
@@ -1173,11 +1178,20 @@ export class MlSlackBot {
 		const { text, files } = await this.context(thread, input);
 		try {
 			await steerRun({
-				conversationId: thread.conversationId,
+				run: { conversationId: thread.conversationId, ownerId: owner._id },
 				text,
 				source: "slack",
-				userId: owner._id,
 				...(thread.hfUserId ? { sessionId: linkedSessionId(thread) } : {}),
+				onQueued: () =>
+					collections.slackThreads
+						.updateOne(
+							{ _id: thread._id },
+							{
+								$max: { contextThroughTs: input.ts },
+								$set: { watching: true, updatedAt: new Date() },
+							}
+						)
+						.then(() => {}),
 			});
 		} catch (error) {
 			if (!(error instanceof QueueFullError || error instanceof QueuedInputTooLongError))
@@ -1193,10 +1207,6 @@ export class MlSlackBot {
 			);
 			return;
 		}
-		await collections.slackThreads.updateOne(
-			{ _id: thread._id },
-			{ $max: { contextThroughTs: input.ts }, $set: { watching: true, updatedAt: new Date() } }
-		);
 		await this.tell(
 			thread.teamId,
 			thread.channel,
@@ -1227,7 +1237,7 @@ export class MlSlackBot {
 	}
 	private async publish(thread: SlackThread): Promise<void> {
 		const { client } = await this.slack(thread.teamId);
-		const turn = await readTurn(thread.conversationId);
+		const turn = await readTurn(this.runOf(thread));
 		if (!turn) return;
 		if (turn.kind === "superseded") {
 			await this.publishSessionStatus(thread, "↪️ Continued with a new message", []);
@@ -1443,7 +1453,7 @@ export class MlSlackBot {
 		if (
 			!live.alive &&
 			!this.active.has(thread._id) &&
-			!(await hasPendingSteers(thread.conversationId)) &&
+			!(await hasPendingSteers(this.runOf(thread))) &&
 			!(await collections.slackInputs.countDocuments(
 				{
 					threadId: thread._id,
@@ -1503,7 +1513,7 @@ export class MlSlackBot {
 		working = false
 	): Promise<void> {
 		const { client } = await this.slack(thread.teamId);
-		const run = await readRunStatus(thread.conversationId);
+		const run = await readRunStatus(this.runOf(thread));
 		if (!run) return;
 		const { budget, plan } = run;
 		const _id = `${thread._id}:status:${run.cardMessageId}`;
@@ -1639,7 +1649,7 @@ export class MlSlackBot {
 
 	private async publishSkippedQuestions(thread: SlackThread): Promise<void> {
 		const { client } = await this.slack(thread.teamId);
-		const questions = await supersededQuestions(thread.conversationId);
+		const questions = await supersededQuestions(this.runOf(thread));
 		for (const question of questions) {
 			const card = await collections.slackDeliveries.findOne({
 				threadId: thread._id,
@@ -1668,7 +1678,7 @@ export class MlSlackBot {
 
 	private async publishAnswers(thread: SlackThread): Promise<void> {
 		const { client } = await this.slack(thread.teamId);
-		const questions = await sharedAnswers(thread.conversationId);
+		const questions = await sharedAnswers(this.runOf(thread));
 		for (const question of questions) {
 			if (!question.content) continue;
 			const _id = `${thread._id}:answer:${question.elicitationId}`;
@@ -1850,7 +1860,7 @@ export class MlSlackBot {
 					{ limit: 1 }
 				))
 			) {
-				if (await isRunSettled(thread.conversationId))
+				if (await isRunSettled(this.runOf(thread)))
 					await collections.slackThreads.updateOne(
 						{ _id: thread._id, updatedAt: thread.updatedAt },
 						{ $set: { watching: false } }
@@ -1919,7 +1929,10 @@ async function startConfiguredSlackBot(): Promise<void> {
 	const settings = slackConfig();
 	if (!settings) return;
 	for await (const thread of collections.slackThreads.find({ deletedAt: { $exists: false } })) {
-		await backfillManagedBy(thread.conversationId, slackManagedBy(thread));
+		await backfillManagedBy(
+			runOf(thread, sharedAccountId(settings.teamId)),
+			slackManagedBy(thread)
+		);
 	}
 	if (
 		!ML_ASSISTANT_MODE ||

@@ -12,6 +12,12 @@ import type { TurnLiveness } from "$lib/server/generation/turnLog";
 
 export type RunId = ObjectId;
 
+/** a run and the account it must belong to, every command and read checks the pair */
+export interface RunRef {
+	conversationId: RunId;
+	ownerId: ObjectId;
+}
+
 export interface RunQuestion {
 	elicitationId: string;
 	generationId?: string;
