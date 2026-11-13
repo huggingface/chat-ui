@@ -385,6 +385,19 @@ class SidePaneStore {
 
 	private saved = new Map<string, SavedPaneState>();
 	private static readonly MAX_SAVED = 20;
+	/** the conversation the pane's state belongs to; unset until a chat view says */
+	private conversation: { key: string | undefined } | null = null;
+
+	/**
+	 * Called by the chat view with the conversation it shows (none on the new
+	 * chat page). The store outlives the view: going through "New Chat" mounts a
+	 * new view, so the store, not the view, remembers whose state it holds.
+	 */
+	enterConversation(key: string | undefined) {
+		if (this.conversation && this.conversation.key === key) return;
+		this.switchConversation(this.conversation?.key, key);
+		this.conversation = { key };
+	}
 
 	/**
 	 * A restored item that no longer exists is closed by its view, the same way

@@ -498,13 +498,11 @@
 	// This used to
 	// piggyback on a first-message-id heuristic that misfired when the first
 	// message was edited; the route param is the real signal.
-	let prevConversationKey = page.params?.id;
+	// The store keeps which conversation its state belongs to, since this view
+	// is mounted anew on the way through the new-chat page.
 	$effect(() => {
 		const key = page.params?.id;
-		if (key !== prevConversationKey) {
-			sidePane.switchConversation(prevConversationKey, key);
-			prevConversationKey = key;
-		}
+		untrack(() => sidePane.enterConversation(key));
 	});
 
 	// The growing content element mounts after the container when a

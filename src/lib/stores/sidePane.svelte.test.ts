@@ -31,6 +31,37 @@ describe("sidePane.switchConversation", () => {
 	});
 });
 
+describe("sidePane.enterConversation", () => {
+	it("keeps each conversation's pane across a new chat view", () => {
+		// conversation a auto-opens its paper
+		sidePane.enterConversation("enter-a");
+		sidePane.maybeAutoOpenPaper("1706.03762", "Attention");
+		expect(sidePane.open).toBe(true);
+
+		// "New Chat": a new view mounts on the new-chat page
+		sidePane.enterConversation(undefined);
+		expect(sidePane.open).toBe(false);
+		expect(sidePane.tabs).toEqual([]);
+
+		// a new conversation opening the same paper still shows it
+		sidePane.enterConversation("enter-b");
+		sidePane.maybeAutoOpenPaper("1706.03762", "Attention");
+		expect(sidePane.view).toBe("paper");
+
+		// and a's pane is where it was left
+		sidePane.enterConversation("enter-a");
+		expect(sidePane.open).toBe(true);
+		expect(sidePane.hasTab("paper:1706.03762")).toBe(true);
+	});
+
+	it("does nothing when the same conversation mounts again", () => {
+		sidePane.enterConversation("enter-c");
+		sidePane.openPaper("1706.03762", "Attention");
+		sidePane.enterConversation("enter-c");
+		expect(sidePane.view).toBe("paper");
+	});
+});
+
 describe("sidePane tabs", () => {
 	it("opens one tab per thing and focuses an open one again", () => {
 		sidePane.openTrackio("https://a.hf.space", "a");
