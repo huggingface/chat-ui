@@ -5,6 +5,7 @@
 	import CarbonLink from "~icons/carbon/link";
 	import CarbonCheckmark from "~icons/carbon/checkmark";
 	import CarbonDownload from "~icons/carbon/download";
+	import CarbonCloudUpload from "~icons/carbon/cloud-upload";
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import { onMount } from "svelte";
@@ -14,17 +15,58 @@
 		open?: boolean;
 		onclose?: () => void;
 		oncopied?: () => void;
-		downloadTrace?: boolean;
+		exportTrace?: boolean;
 	}
 
-	let { open = false, onclose, oncopied, downloadTrace = false }: Props = $props();
+	let { open = false, onclose, oncopied, exportTrace = false }: Props = $props();
 
 	// the reader of a share snapshot is not its owner
 	let traceUrl = $derived(
-		downloadTrace && page.params.id && page.params.id.length !== 7
+		exportTrace && page.params.id && page.params.id.length !== 7
 			? `${base}/api/v2/conversations/${page.params.id}/export`
 			: undefined
 	);
+
+	let canPush = $derived(Boolean(traceUrl && page.data.traceDatasetPush));
+	let datasetRepo = $state(
+		page.data.user?.username ? `${page.data.user.username}/ml-intern-traces` : ""
+	);
+	let pushing = $state(false);
+	let pushed: { url: string; created: boolean; private: boolean } | null = $state(null);
+	let pushError: string | null = $state(null);
+	let publicWarning: string | null = $state(null);
+
+	async function push(allowPublic: boolean) {
+		if (!traceUrl || pushing) return;
+		pushing = true;
+		pushed = null;
+		pushError = null;
+		publicWarning = null;
+		try {
+			const res = await fetch(`${traceUrl}/dataset`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ repo: datasetRepo, allowPublic }),
+			});
+			const body = await res.json().catch(() => null);
+			if (body?.code === "public-dataset") {
+				publicWarning = body.message;
+				return;
+			}
+			if (!res.ok) throw new Error(body?.message || `Push failed (${res.status})`);
+			pushed = body;
+		} catch (e) {
+			pushError = (e as Error).message || "Push failed";
+		} finally {
+			pushing = false;
+		}
+	}
+
+	function resetPush() {
+		pushed = null;
+		pushError = null;
+		publicWarning = null;
+	}
 
 	let creating = $state(false);
 	let createdUrl: string | null = $state(null);
@@ -211,6 +253,79 @@
 						Download
 					</a>
 				</div>
+				{#if canPush}
+					<form
+						class="flex flex-col gap-2"
+						onsubmit={(event) => {
+							event.preventDefault();
+							push(false);
+						}}
+					>
+						<div class="min-w-0">
+							<div class="text-sm font-medium text-gray-800 dark:text-gray-200">
+								Push trace to a dataset
+							</div>
+							<div class="text-sm text-gray-600 dark:text-gray-400">
+								Saves the same JSON in the dataset as <code>traces/{page.params.id}.json</code>. A
+								dataset that does not exist yet is created private.
+							</div>
+						</div>
+						<div class="flex items-center gap-2">
+							<input
+								class="h-9 min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm text-gray-700 outline-hidden focus:border-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+								aria-label="Dataset repo"
+								placeholder="owner/dataset"
+								spellcheck="false"
+								autocomplete="off"
+								bind:value={datasetRepo}
+								oninput={resetPush}
+							/>
+							<button
+								type="submit"
+								disabled={pushing || !datasetRepo.trim()}
+								class="inline-flex flex-none items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+							>
+								{#if pushing}
+									<EosIconsLoading class="text-[1.05em]" />
+									Pushing…
+								{:else}
+									<CarbonCloudUpload class="text-[1.05em]" />
+									Push
+								{/if}
+							</button>
+						</div>
+						{#if pushed}
+							<div class="text-sm text-gray-600 dark:text-gray-400">
+								<CarbonCheckmark class="inline text-green-600 dark:text-green-400" />
+								{pushed.created
+									? "Created the private dataset and pushed."
+									: pushed.private
+										? "Pushed."
+										: "Pushed to the public dataset."}
+								<a
+									href={pushed.url}
+									target="_blank"
+									rel="noreferrer"
+									class="underline hover:text-gray-800 dark:hover:text-gray-200">View on the Hub</a
+								>
+							</div>
+						{:else if publicWarning}
+							<div
+								class="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-500/10 dark:text-amber-200"
+							>
+								<span class="min-w-0 flex-1">{publicWarning}</span>
+								<button
+									type="button"
+									disabled={pushing}
+									class="flex-none font-medium underline disabled:opacity-50"
+									onclick={() => push(true)}>Push anyway</button
+								>
+							</div>
+						{:else if pushError}
+							<div class="text-sm text-red-700 dark:text-red-300">{pushError}</div>
+						{/if}
+					</form>
+				{/if}
 			{/if}
 		</div>
 	</Modal>
