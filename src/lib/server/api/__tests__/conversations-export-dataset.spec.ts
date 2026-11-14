@@ -73,11 +73,12 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 		await expectStatus(push(locals, new ObjectId().toString(), { repo: "a/b" }), 401);
 	});
 
-	it("404s a conversation outside ML Intern", async () => {
+	it("pushes a conversation outside ML Intern too", async () => {
 		const { locals } = await signedIn();
 		const conv = await createTestConversation(locals);
-		await expectStatus(push(locals, conv._id.toString(), { repo: "a/b" }), 404);
-		expect(hub.commit).not.toHaveBeenCalled();
+		const res = await push(locals, conv._id.toString(), { repo: "a/b" });
+		expect(res.status).toBe(200);
+		expect(hub.commit).toHaveBeenCalledTimes(1);
 	});
 
 	it("403s a sign-in that cannot write to the Hub", async () => {
@@ -104,25 +105,25 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 		expect((await res.json()).repo).toBe("alice/traces");
 	});
 
-	it("commits the trace to traces/<id>.json with the user token", async () => {
+	it("commits the trace to <last 6 of id>.json with the user token", async () => {
 		const { locals } = await signedIn();
 		const conv = await createTestConversation(locals, {
 			mlAssistant: true,
 			title: "Fine-tune SmolLM",
 		});
-		const res = await push(locals, conv._id.toString(), { repo: "alice/ml-intern-traces" });
+		const res = await push(locals, conv._id.toString(), { repo: "alice/hf-chat-traces" });
 
-		const path = `traces/${conv._id.toString()}.json`;
+		const path = `${conv._id.toString().slice(-6)}.json`;
 		expect(await res.json()).toEqual({
-			repo: "alice/ml-intern-traces",
+			repo: "alice/hf-chat-traces",
 			path,
-			url: `https://huggingface.co/datasets/alice/ml-intern-traces/blob/main/${path}`,
+			url: `https://huggingface.co/datasets/alice/hf-chat-traces/blob/main/${path}`,
 			created: false,
 			private: true,
 		});
 		const call = vi.mocked(hub.commit).mock.calls[0][0];
 		expect(call).toMatchObject({
-			repo: { type: "dataset", name: "alice/ml-intern-traces" },
+			repo: { type: "dataset", name: "alice/hf-chat-traces" },
 			accessToken: "hf_user",
 		});
 		const [operation] = call.operations;
@@ -144,8 +145,8 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 
 		const paths = vi.mocked(hub.commit).mock.calls.map(([call]) => call.operations[0].path);
 		expect(paths).toEqual([
-			`traces/${conv._id.toString()}.json`,
-			`traces/${conv._id.toString()}.json`,
+			`${conv._id.toString().slice(-6)}.json`,
+			`${conv._id.toString().slice(-6)}.json`,
 		]);
 	});
 

@@ -9,27 +9,27 @@
 	import EosIconsLoading from "~icons/eos-icons/loading";
 	import CopyToClipBoardBtn from "$lib/components/CopyToClipBoardBtn.svelte";
 	import { onMount } from "svelte";
+	import { traceDatasetFile } from "$lib/utils/traceDatasetFile";
 	import { createShareLink } from "$lib/createShareLink";
 
 	interface Props {
 		open?: boolean;
 		onclose?: () => void;
 		oncopied?: () => void;
-		exportTrace?: boolean;
 	}
 
-	let { open = false, onclose, oncopied, exportTrace = false }: Props = $props();
+	let { open = false, onclose, oncopied }: Props = $props();
 
 	// the reader of a share snapshot is not its owner
 	let traceUrl = $derived(
-		exportTrace && page.params.id && page.params.id.length !== 7
+		page.params.id && page.params.id.length !== 7
 			? `${base}/api/v2/conversations/${page.params.id}/export`
 			: undefined
 	);
 
 	let canPush = $derived(Boolean(traceUrl && page.data.traceDatasetPush));
 	let datasetRepo = $state(
-		page.data.user?.username ? `${page.data.user.username}/ml-intern-traces` : ""
+		page.data.user?.username ? `${page.data.user.username}/hf-chat-traces` : ""
 	);
 	let pushing = $state(false);
 	let pushed: { url: string; created: boolean; private: boolean } | null = $state(null);
@@ -241,7 +241,7 @@
 					<div class="min-w-0 flex-1">
 						<div class="text-sm font-medium text-gray-800 dark:text-gray-200">Download trace</div>
 						<div class="text-sm text-gray-600 dark:text-gray-400">
-							Every message, tool call, job and file as JSON. Nothing is made public.
+							The full conversation as JSON, tool calls included. Nothing is made public.
 						</div>
 					</div>
 					<a
@@ -261,25 +261,16 @@
 							push(false);
 						}}
 					>
-						<div class="min-w-0">
-							<div class="text-sm font-medium text-gray-800 dark:text-gray-200">
-								Push trace to a dataset
+						<div class="flex items-center gap-3">
+							<div class="min-w-0 flex-1">
+								<div class="text-sm font-medium text-gray-800 dark:text-gray-200">
+									Push trace to a dataset
+								</div>
+								<div class="text-sm text-gray-600 dark:text-gray-400">
+									Saves the agent traces in a Hugging Face dataset with the name below. A dataset
+									that does not exist yet is created private.
+								</div>
 							</div>
-							<div class="text-sm text-gray-600 dark:text-gray-400">
-								Saves the agent traces in a Hugging Face dataset. A dataset that does not exist yet
-								is created private.
-							</div>
-						</div>
-						<div class="flex items-center gap-2">
-							<input
-								class="h-9 min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm text-gray-700 outline-hidden focus:border-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-								aria-label="Dataset repo"
-								placeholder="owner/dataset"
-								spellcheck="false"
-								autocomplete="off"
-								bind:value={datasetRepo}
-								oninput={resetPush}
-							/>
 							<button
 								type="submit"
 								disabled={pushing || !datasetRepo.trim()}
@@ -293,6 +284,20 @@
 									Push
 								{/if}
 							</button>
+						</div>
+						<div class="flex items-center gap-2">
+							<input
+								class="h-9 min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm text-gray-700 outline-hidden focus:border-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+								aria-label="Dataset repo"
+								placeholder="owner/dataset"
+								spellcheck="false"
+								autocomplete="off"
+								bind:value={datasetRepo}
+								oninput={resetPush}
+							/>
+							<code class="flex-none text-sm text-gray-600 dark:text-gray-400"
+								>/ {traceDatasetFile(page.params.id ?? "")}</code
+							>
 						</div>
 						{#if pushed}
 							<div class="text-sm text-gray-600 dark:text-gray-400">

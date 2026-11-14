@@ -6,7 +6,6 @@ import type { FeatureFlags } from "$lib/server/api/types";
 import { mlAssistantModelIds } from "$lib/server/mlAssistantModels";
 import { mcpSyncStatus } from "$lib/server/mcp/savedSelection";
 import { getUserHubWriteToken } from "$lib/server/apiToken";
-import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 
 export const GET: RequestHandler = async ({ locals }) => {
 	// Mirror the title-generation resolution (generateFromDefaultEndpoint): the
@@ -32,6 +31,6 @@ export const GET: RequestHandler = async ({ locals }) => {
 		taskModelId,
 		mlAssistantModels: mlAssistantModelIds(),
 		slackMcpSync: locals.user ? await mcpSyncStatus(locals.user._id) : null,
-		traceDatasetPush: ML_ASSISTANT_MODE && !!getUserHubWriteToken(locals),
+		traceDatasetPush: !!getUserHubWriteToken(locals),
 	} satisfies FeatureFlags);
 };

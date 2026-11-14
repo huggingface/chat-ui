@@ -29,8 +29,6 @@ export const traceRepoSchema = z
 			)
 	);
 
-export const tracePath = (conversationId: string) => `traces/${conversationId}.json`;
-
 export type TracePushResult =
 	| { ok: true; url: string; created: boolean; private: boolean }
 	| { ok: false; status: number; message: string; code?: "public-dataset" };
@@ -61,7 +59,7 @@ export async function pushTraceToDataset(params: {
 		commit({
 			repo,
 			accessToken,
-			title: `Add ML Intern trace: ${title}`.slice(0, 200),
+			title: `Add chat trace: ${title}`.slice(0, 200),
 			operations: [
 				{
 					operation: "addOrUpdate",

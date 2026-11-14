@@ -4,8 +4,8 @@ import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { resolveConversation } from "$lib/server/api/utils/resolveConversation";
 import { getUserHubWriteToken } from "$lib/server/apiToken";
 import { buildConversationTrace } from "$lib/server/conversationTrace";
-import { isMlAssistantConversation } from "$lib/server/mlAssistant";
-import { pushTraceToDataset, traceRepoSchema, tracePath } from "$lib/server/traceToHub";
+import { pushTraceToDataset, traceRepoSchema } from "$lib/server/traceToHub";
+import { traceDatasetFile } from "$lib/utils/traceDatasetFile";
 
 const bodySchema = z.object({
 	repo: traceRepoSchema,
@@ -17,9 +17,8 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 
 	const id = params.id ?? "";
 	const conversation = await resolveConversation(id, locals);
-	if (conversation.kind === "share" || !isMlAssistantConversation(conversation)) {
-		error(404, "Conversation not found");
-	}
+	// a share snapshot's reader is not its owner
+	if (conversation.kind === "share") error(404, "Conversation not found");
 	const accessToken = getUserHubWriteToken(locals);
 	if (!accessToken) error(403, "This sign-in cannot write to the Hugging Face Hub.");
 
@@ -28,7 +27,7 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 	const { repo, allowPublic } = body.data;
 
 	const trace = await buildConversationTrace(conversation.objectId, conversation);
-	const path = tracePath(trace.conversation.id);
+	const path = traceDatasetFile(trace.conversation.id);
 	const result = await pushTraceToDataset({
 		repo,
 		accessToken,
