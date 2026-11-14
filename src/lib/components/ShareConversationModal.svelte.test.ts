@@ -43,7 +43,7 @@ describe("ShareConversationModal push to dataset", () => {
 	it("says where the trace goes", () => {
 		mount(ID, { username: "alice" });
 		expect(document.body.textContent).toContain("Saves the agent traces in a Hugging Face dataset");
-		expect(document.body.textContent).toContain(`${ID.slice(-6)}.json`);
+		expect(document.body.textContent).toContain(`${ID.slice(-8)}.json`);
 	});
 
 	it("suggests a dataset in the user's namespace and links the pushed file", async () => {

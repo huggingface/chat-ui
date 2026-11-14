@@ -106,7 +106,7 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 		expect((await res.json()).repo).toBe("alice/traces");
 	});
 
-	it("commits the session trace to <last 6 of id>.jsonl with the user token", async () => {
+	it("commits the session trace to <last 8 of id>.jsonl with the user token", async () => {
 		const { locals } = await signedIn();
 		const conv = await createTestConversation(locals, {
 			mlAssistant: true,
@@ -114,7 +114,7 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 		});
 		const res = await push(locals, conv._id.toString(), { repo: "alice/hf-chat-traces" });
 
-		const path = `${conv._id.toString().slice(-6)}.jsonl`;
+		const path = `${conv._id.toString().slice(-8)}.jsonl`;
 		expect(await res.json()).toEqual({
 			repo: "alice/hf-chat-traces",
 			path,
@@ -165,8 +165,8 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 
 		const paths = vi.mocked(hub.commit).mock.calls.map(([call]) => call.operations[0].path);
 		expect(paths).toEqual([
-			`${conv._id.toString().slice(-6)}.jsonl`,
-			`${conv._id.toString().slice(-6)}.jsonl`,
+			`${conv._id.toString().slice(-8)}.jsonl`,
+			`${conv._id.toString().slice(-8)}.jsonl`,
 		]);
 	});
 
