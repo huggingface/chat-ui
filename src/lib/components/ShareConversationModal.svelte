@@ -247,7 +247,7 @@
 					<a
 						href={traceUrl}
 						download
-						class="inline-flex flex-none items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+						class="inline-flex w-29 flex-none items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
 					>
 						<CarbonDownload class="text-[1.05em]" />
 						Download
@@ -266,8 +266,8 @@
 								Push trace to a dataset
 							</div>
 							<div class="text-sm text-gray-600 dark:text-gray-400">
-								Saves the same JSON in the dataset as <code>traces/{page.params.id}.json</code>. A
-								dataset that does not exist yet is created private.
+								Saves the agent traces in a Hugging Face dataset. A dataset that does not exist yet
+								is created private.
 							</div>
 						</div>
 						<div class="flex items-center gap-2">
@@ -283,7 +283,7 @@
 							<button
 								type="submit"
 								disabled={pushing || !datasetRepo.trim()}
-								class="inline-flex flex-none items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+								class="inline-flex w-29 flex-none items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
 							>
 								{#if pushing}
 									<EosIconsLoading class="text-[1.05em]" />

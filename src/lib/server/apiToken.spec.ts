@@ -39,9 +39,16 @@ describe("getUserHubWriteToken", () => {
 		expect(getUserHubWriteToken(locals)).toBeUndefined();
 	});
 
-	it("trusts an operator who opted into user tokens", () => {
+	it("trusts an operator who opted into user tokens from another provider", () => {
 		config.USE_USER_TOKEN = "true";
+		config.OPENID_PROVIDER_URL = "https://auth.example.com";
 		config.OPENID_SCOPES = "openid";
 		expect(getUserHubWriteToken(locals)).toBe("user_token");
+	});
+
+	it("still needs contribute-repos from a Hub sign-in when user tokens are on", () => {
+		config.USE_USER_TOKEN = "true";
+		config.OPENID_SCOPES = "openid";
+		expect(getUserHubWriteToken(locals)).toBeUndefined();
 	});
 });

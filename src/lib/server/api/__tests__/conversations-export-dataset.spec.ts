@@ -190,6 +190,19 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 		expect((await res.json()).message).toContain("only write to datasets it created");
 	});
 
+	it("tells a sign-in that cannot create datasets to sign in again", async () => {
+		const { locals } = await signedIn();
+		const conv = await createTestConversation(locals, { mlAssistant: true });
+		vi.mocked(hub.datasetInfo).mockRejectedValue(hubError(404));
+		vi.mocked(hub.createRepo).mockRejectedValueOnce(hubError(403));
+
+		const res = await push(locals, conv._id.toString(), { repo: "alice/new" });
+		expect(res.status).toBe(403);
+		const { message } = await res.json();
+		expect(message).toContain("Sign out and back in");
+		expect(message).not.toContain("try a new dataset name");
+	});
+
 	it("reports an inaccessible private repo the Hub 404s then 409s as 403", async () => {
 		const { locals } = await signedIn();
 		const conv = await createTestConversation(locals, { mlAssistant: true });
@@ -198,6 +211,7 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 
 		const res = await push(locals, conv._id.toString(), { repo: "bob/private" });
 		expect(res.status).toBe(403);
+		expect((await res.json()).message).toContain("try a new dataset name");
 		expect(hub.commit).not.toHaveBeenCalled();
 	});
 

@@ -72,6 +72,8 @@ export async function pushTraceToDataset(params: {
 		});
 
 	let created = false;
+	// set while the Hub is refusing to create the dataset, not to write to one
+	let createRefused = false;
 	try {
 		const seen = await visibility(name, accessToken);
 		if (seen === "public" && !allowPublic) {
@@ -85,7 +87,9 @@ export async function pushTraceToDataset(params: {
 		if (seen === "missing") {
 			// the hub 404s a private repo the token cannot see, then 409s creating it
 			await createRepo({ repo, accessToken, private: true }).catch((err) => {
-				throw statusOf(err) === 409 ? new HubApiError("", 403) : err;
+				if (statusOf(err) === 409) throw new HubApiError("", 403);
+				createRefused = true;
+				throw err;
 			});
 			created = true;
 			await afterCreate(write);
@@ -105,7 +109,10 @@ export async function pushTraceToDataset(params: {
 			return {
 				ok: false,
 				status: 403,
-				message: `Hugging Face did not let this sign-in write to ${name}. The app can only write to datasets it created, so try a new dataset name.`,
+				// a sign-in from before the app asked for repo access cannot create anything, a new name would not help
+				message: createRefused
+					? `Hugging Face did not let this sign-in create ${name}. Sign out and back in to grant access to your repositories, and check that you can create datasets under ${name.split("/")[0]}.`
+					: `Hugging Face did not let this sign-in write to ${name}. The app can only write to datasets it created, so try a new dataset name.`,
 			};
 		}
 		if (status === 409) {
