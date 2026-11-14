@@ -767,6 +767,101 @@ describe("Slack transport authorization", () => {
 		});
 	});
 
+	it("clears modal and finalizes question card when an interrupted or stopped question is submitted", async () => {
+		const { user, locals } = await createTestUser();
+		const bot = new MlSlackBot(settings, user);
+		await bot.receive(
+			{ channel: "C123", user: "OWNER", text: "Start", ts: "100.0" },
+			"T123",
+			"INTERRUPTED"
+		);
+		await collections.slackInputs.updateMany({}, { $set: { status: "done" } });
+		const thread = await collections.slackThreads.findOne({});
+		if (!thread) throw Error("No thread");
+
+		const messageId = crypto.randomUUID(),
+			generationId = crypto.randomUUID(),
+			elicitationId = crypto.randomUUID();
+		await createTestConversation(locals, {
+			_id: thread.conversationId,
+			messages: [{ id: messageId, generationId, from: "assistant", content: "Need clarification", createdAt: new Date() }],
+		});
+		await collections.turnStates.insertOne({
+			_id: new ObjectId(),
+			conversationId: thread.conversationId,
+			messageId,
+			producerId: generationId,
+			status: "awaiting_input",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+		await collections.mcpElicitations.insertOne({
+			_id: new ObjectId(),
+			conversationId: thread.conversationId,
+			generationId,
+			elicitationId,
+			status: "pending",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			pending: { kind: "ask", messageId, toolCallId: "c", toolUuid: "u" },
+			request: {
+				elicitationId,
+				source: "assistant",
+				mode: "form",
+				message: "Choose an option",
+				fields: [{ kind: "text", name: "answer", label: "Answer", required: true }],
+			},
+		});
+		await collections.slackDeliveries.insertOne({
+			_id: `${messageId}:question:${elicitationId}`,
+			threadId: thread._id,
+			messageId,
+			questionId: elicitationId,
+			parts: ["101.0"],
+			updatedAt: new Date(),
+		});
+
+		// Turn is stopped or interrupted
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId },
+			{
+				$set: {
+					status: "resolved",
+					action: "cancel",
+					resolution: "aborted",
+					resolvedAt: new Date(),
+				},
+			}
+		);
+
+		// Render should finalize the question card
+		await bot["render"](thread);
+		expect(mocks.update).toHaveBeenCalledWith(
+			expect.objectContaining({
+				channel: "C123",
+				ts: "101.0",
+				text: "Question cancelled — turn was stopped.",
+			})
+		);
+		const delivery = await collections.slackDeliveries.findOne({ questionId: elicitationId });
+		expect(delivery?.questionFinalized).toBe(true);
+
+		// Stale modal submission should clear cleanly, NOT return errors
+		const viewHandler = mocks.handlers.get(ANSWER_VIEW);
+		if (!viewHandler) throw Error("No view handler");
+		const ack = vi.fn();
+		await viewHandler({
+			ack,
+			body: { user: { id: "OWNER" }, team: { id: "T123" } },
+			view: {
+				private_metadata: JSON.stringify({ threadId: thread._id, elicitationId }),
+				state: { values: { answer: { answer: { value: "some answer" } } } },
+			},
+		});
+		expect(ack).toHaveBeenCalledWith({ response_action: "clear" });
+		expect(mocks.ephemeral.mock.lastCall?.[0].text).toContain("already been answered, cancelled, or expired");
+	});
+
 	it("only lets the owner replace a pending question with a new request", async () => {
 		const { user, locals } = await createTestUser();
 		const bot = new MlSlackBot(settings, user);
