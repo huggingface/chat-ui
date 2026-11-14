@@ -160,8 +160,8 @@
 				</h4>
 				{#each convs as conv (String(conv.id))}
 					<NavConversationItem
-						readOnly={conv.managedBy?.kind === "slack" ? true : undefined}
-						allowDelete={conv.managedBy?.kind === "slack"}
+						readOnly={conv.managedBy ? true : undefined}
+						allowDelete={!!conv.managedBy}
 						{conv}
 						{oneditConversationTitle}
 						{ondeleteConversation}

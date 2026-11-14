@@ -2,6 +2,7 @@ import { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { AbortRegistry } from "$lib/server/abortRegistry";
+import { isManagedConversation } from "$lib/server/mlRun/managed";
 import type { Conversation } from "$lib/types/Conversation";
 import type { MlReview } from "$lib/types/MlReview";
 
@@ -14,7 +15,7 @@ const SERVER_RESUMED_ROUTES = new Set([
 ]);
 
 const isSlackManaged = (conv: Pick<Conversation, "managedBy" | "sessionId">) =>
-	conv.managedBy?.kind === "slack" || !!conv.sessionId?.startsWith("slack-user:");
+	isManagedConversation(conv) || !!conv.sessionId?.startsWith("slack-user:");
 
 export async function retireSlackConversations(ids: ObjectId[]): Promise<ObjectId[]> {
 	await collections.slackThreads.updateMany(
