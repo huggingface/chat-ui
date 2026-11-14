@@ -144,6 +144,20 @@ describe("workflowTokenHandler", () => {
 		expect(consent).not.toHaveBeenCalled();
 	});
 
+	it("gives a workflow in a background tab no token and asks nothing", async () => {
+		const onMessage = workflowTokenHandler({
+			frame: () => frame as never,
+			origin: ORIGIN,
+			spaceId: "someone-else/wf",
+			viewer: "hmb",
+			consent,
+			shown: () => false,
+		});
+		await onMessage(tokenRequest());
+		expect(consent).not.toHaveBeenCalled();
+		expect(frame.postMessage).toHaveBeenCalledWith(...tokenReply(null));
+	});
+
 	it.each([
 		["another window", { source: {} as never }],
 		["another origin", { origin: "https://evil.hf.space" }],

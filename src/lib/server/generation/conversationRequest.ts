@@ -20,6 +20,8 @@ import { convertLegacyConversation } from "$lib/utils/tree/convertLegacyConversa
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { acceptTrackioViews } from "$lib/server/trackioViews";
 import { MAX_VIEWS_PER_MESSAGE } from "$lib/utils/trackioView";
+import { MAX_QUOTES_PER_MESSAGE } from "$lib/utils/paper";
+import { acceptPaperQuotes } from "$lib/server/papers/quotes";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree.js";
 import { addChildren } from "$lib/utils/tree/addChildren.js";
 import { addSibling } from "$lib/utils/tree/addSibling.js";
@@ -196,6 +198,7 @@ export async function generateConversationResponse({
 		selectedMcpServers,
 		timezone,
 		dashboardViews: rawDashboardViews,
+		paperQuotes: rawPaperQuotes,
 	} = z
 		.object({
 			id: z.string().uuid().refine(isMessageId).optional(), // parent message id to append to for a normal message, or the message id for a retry/continue
@@ -228,6 +231,7 @@ export async function generateConversationResponse({
 				.default([]),
 			timezone: z.optional(z.string()),
 			dashboardViews: z.optional(z.array(z.unknown()).max(MAX_VIEWS_PER_MESSAGE)),
+			paperQuotes: z.optional(z.array(z.unknown()).max(MAX_QUOTES_PER_MESSAGE)),
 			files: z.optional(
 				z.array(
 					z.object({
@@ -306,6 +310,7 @@ export async function generateConversationResponse({
 		(files) => [...files, ...hashFiles]
 	);
 	const dashboardViews = acceptTrackioViews(rawDashboardViews, conv.messages);
+	const paperQuotes = await acceptPaperQuotes(rawPaperQuotes, conv._id);
 
 	// a racing send and a queued start would each save the whole messages array over the other
 	const guardTurnStart =
@@ -394,6 +399,9 @@ export async function generateConversationResponse({
 					...(messageToRetry.dashboardViews?.length
 						? { dashboardViews: messageToRetry.dashboardViews }
 						: {}),
+					...(messageToRetry.paperQuotes?.length
+						? { paperQuotes: messageToRetry.paperQuotes }
+						: {}),
 					createdAt: new Date(),
 					updatedAt: new Date(),
 				},
@@ -431,6 +439,7 @@ export async function generateConversationResponse({
 				content: newPrompt ?? "",
 				files: uploadedFiles,
 				...(dashboardViews.length ? { dashboardViews } : {}),
+				...(paperQuotes.length ? { paperQuotes } : {}),
 				createdAt: new Date(),
 				updatedAt: new Date(),
 			},

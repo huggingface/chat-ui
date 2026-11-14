@@ -181,8 +181,12 @@ describe.sequential("tool result images in GridFS", () => {
 	});
 
 	describe("served by the output route", () => {
-		const fetchImage = (id: string, sha: string, locals: App.Locals) =>
-			GET({ params: { id, sha256: sha }, locals } as never);
+		const fetchImage = (id: string, sha: string, locals: App.Locals, range?: string) =>
+			GET({
+				params: { id, sha256: sha },
+				locals,
+				request: new Request("http://localhost/", range ? { headers: { range } } : {}),
+			} as never);
 
 		it("serves the bytes to the owner, under the stored mime type", async () => {
 			const { locals } = await createTestUser();
@@ -194,6 +198,21 @@ describe.sequential("tool result images in GridFS", () => {
 
 			expect(res.headers.get("Content-Type")).toBe("image/png");
 			expect(Buffer.from(await res.arrayBuffer()).equals(bytes)).toBe(true);
+		});
+
+		it("serves a byte range, and refuses one past the end", async () => {
+			const { locals } = await createTestUser();
+			const conv = await createTestConversation(locals);
+			const bytes = randomBytes(300);
+			const { sha } = await storeToolImage(conv._id, inline(bytes, "image/png"));
+
+			const part = await fetchImage(conv._id.toString(), sha, locals, "bytes=100-199");
+			expect(part.status).toBe(206);
+			expect(part.headers.get("Content-Range")).toBe("bytes 100-199/300");
+			expect(Buffer.from(await part.arrayBuffer()).equals(bytes.subarray(100, 200))).toBe(true);
+
+			const past = await fetchImage(conv._id.toString(), sha, locals, "bytes=300-");
+			expect(past.status).toBe(416);
 		});
 
 		it("serves a share, and a conversation imported from it, the images the share copied", async () => {

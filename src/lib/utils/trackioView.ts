@@ -158,20 +158,20 @@ export const VIEW_TOKEN_MARK = "\u2063";
  * No-break spaces, since en/em spaces are line-break points and the icon
  * would be stranded at a line end.
  */
-const VIEW_TOKEN_LEAD = "\u00a0".repeat(4) + "\u202f";
+export const VIEW_TOKEN_LEAD = "\u00a0".repeat(4) + "\u202f";
 const VIEW_TOKEN = /\u2063([^\u2063\n]{1,400})\u2063/g;
 /**
  * VS1–VS8 (U+FE00–FE07): zero-width in every engine. Tag characters and the
  * Mongolian selectors are not in WebKit, and VS15/VS16 switch emoji style.
  */
 const KEY_DIGIT_BASE = 0xfe00;
-const ENCODED_KEY = /[\ufe00-\ufe07]+$/;
+export const ENCODED_KEY = /[\ufe00-\ufe07]+$/;
 
-function encodeKey(key: string): string {
+export function encodeKey(key: string): string {
 	return [...key].map((d) => String.fromCharCode(KEY_DIGIT_BASE + Number(d))).join("");
 }
 
-function decodeKey(encoded: string): string {
+export function decodeKey(encoded: string): string {
 	return [...encoded].map((c) => String(c.charCodeAt(0) - KEY_DIGIT_BASE)).join("");
 }
 
@@ -181,11 +181,11 @@ export function trackioViewLabel(view: TrackioDashboardView): string {
 }
 
 /** No-break twins of every break opportunity, so a chip wraps whole. */
-function unbreakable(label: string): string {
+export function unbreakable(label: string): string {
 	return label.replaceAll(" ", "\u00a0").replaceAll("-", "\u2011").replaceAll("–", "\u2060–\u2060");
 }
 
-function breakable(label: string): string {
+export function breakable(label: string): string {
 	return label.replaceAll("\u00a0", " ").replaceAll("\u2011", "-").replaceAll("\u2060", "");
 }
 
