@@ -9,8 +9,10 @@
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 	import type { TrackioDashboard } from "$lib/utils/trackio";
 	import type { WorkflowSpace } from "$lib/utils/workflowSpace";
+	import type { PaperRef } from "$lib/utils/paper";
 	import CarbonBox from "~icons/carbon/box";
 	import CarbonFlow from "~icons/carbon/flow";
+	import CarbonDocumentPdf from "~icons/carbon/document-pdf";
 
 	interface Props {
 		/** Collapses the strip out of the composer when false, rather than unmounting it. */
@@ -25,6 +27,8 @@
 		/** The run's newest Trackio dashboard, if it has named one. */
 		dashboard?: TrackioDashboard;
 		workflow?: WorkflowSpace;
+		/** papers open_paper opened in this conversation, oldest first */
+		papers?: PaperRef[];
 		/** the control stays hidden until the registry holds anything */
 		registry?: MlRegistrySummary;
 	}
@@ -38,6 +42,7 @@
 		onbudgetchange,
 		dashboard,
 		workflow,
+		papers = [],
 		registry,
 	}: Props = $props();
 
@@ -91,6 +96,21 @@
 		if (!workflow || !workflowLive) return;
 		if (workflowShowing) sidePane.close();
 		else sidePane.openWorkflow(workflow);
+	}
+
+	let paperShowing = $derived(sidePane.open && sidePane.view === "paper");
+	/** the paper read most recently, else the newest one opened */
+	let paperToOpen = $derived.by(() => {
+		for (const id of sidePane.recent) {
+			const paper = papers.find((p) => `paper:${p.id}` === id);
+			if (paper) return paper;
+		}
+		return papers.at(-1);
+	});
+
+	function togglePaper() {
+		if (paperShowing) sidePane.close();
+		else if (paperToOpen) sidePane.openPaper(paperToOpen.id, paperToOpen.title);
 	}
 
 	function toggleDashboard() {
@@ -325,8 +345,28 @@
 			</button>
 		{/if}
 
+		{#if paperToOpen}
+			<button
+				type="button"
+				class={[
+					"ml-control flex flex-none items-center justify-center gap-[6px] px-2 py-[5px]",
+					"size-7 rounded-full @min-[480px]:size-auto @min-[480px]:rounded-[6px]",
+					"cursor-pointer text-[13px] leading-none font-medium text-[#57534e] hover:bg-black/5 hover:text-[#1c1917] dark:text-[#a8a29e] dark:hover:bg-white/[.07] dark:hover:text-[#f5f5f4]",
+				]}
+				title={paperShowing ? "Close the paper reader" : `Read: ${paperToOpen.title}`}
+				aria-label={papers.length > 1 ? `Papers (${papers.length})` : `Paper: ${paperToOpen.title}`}
+				aria-pressed={paperShowing}
+				onclick={togglePaper}
+			>
+				<CarbonDocumentPdf class="size-[14px] shrink-0" />
+				<span class="hidden @min-[480px]:inline"
+					>{papers.length > 1 ? `Papers (${papers.length})` : "Paper"}</span
+				>
+			</button>
+		{/if}
+
 		{#if budget}
-			{#if dashboard || workflow || registryVisible}
+			{#if dashboard || workflow || paperToOpen || registryVisible}
 				<!-- Negative margin pulls its neighbours to 8px, inside the 14px group gap. -->
 				<span
 					aria-hidden="true"

@@ -1,9 +1,11 @@
 import type { TrackioDashboardView } from "$lib/utils/trackioView";
+import type { PaperQuote } from "$lib/utils/paper";
 
 export interface ComposerDraft {
 	draft: string;
 	files: File[];
 	dashboardViews: TrackioDashboardView[];
+	paperQuotes: PaperQuote[];
 }
 
 /**
@@ -16,7 +18,12 @@ const MAX_DRAFTS = 20;
 
 export function saveComposerDraft(conversationId: string, draft: ComposerDraft): void {
 	if (!conversationId) return;
-	if (!draft.draft.trim() && !draft.files.length && !draft.dashboardViews.length) {
+	if (
+		!draft.draft.trim() &&
+		!draft.files.length &&
+		!draft.dashboardViews.length &&
+		!draft.paperQuotes.length
+	) {
 		drafts.delete(conversationId);
 		return;
 	}
@@ -32,5 +39,5 @@ export function saveComposerDraft(conversationId: string, draft: ComposerDraft):
 export function takeComposerDraft(conversationId: string): ComposerDraft {
 	const draft = drafts.get(conversationId);
 	drafts.delete(conversationId);
-	return draft ?? { draft: "", files: [], dashboardViews: [] };
+	return draft ?? { draft: "", files: [], dashboardViews: [], paperQuotes: [] };
 }

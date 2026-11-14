@@ -333,3 +333,34 @@ body {
 .dark ::highlight(review-quote) {
 	text-decoration-color: rgb(251 191 36 / 0.45);
 }
+
+/* A citation into a paper open in the reader, written by the model as
+   [p. 5](paper:<id>#p5 "exact words"). Reads as a small page tag, not a link. */
+.prose a.paper-cite,
+a.paper-cite {
+	display: inline-block;
+	margin: 0 0.1em;
+	padding: 0 0.35em;
+	border-radius: 0.3em;
+	font-size: 0.82em;
+	font-weight: 500;
+	line-height: 1.45;
+	text-decoration: none;
+	white-space: nowrap;
+	color: #0f766e;
+	background: rgb(15 118 110 / 0.09);
+	box-shadow: 0 0 0 1px rgb(15 118 110 / 0.12);
+	cursor: pointer;
+	vertical-align: 0.05em;
+}
+a.paper-cite:hover {
+	background: rgb(15 118 110 / 0.16);
+}
+.dark a.paper-cite {
+	color: #5eead4;
+	background: rgb(94 234 212 / 0.1);
+	box-shadow: 0 0 0 1px rgb(94 234 212 / 0.14);
+}
+.dark a.paper-cite:hover {
+	background: rgb(94 234 212 / 0.18);
+}

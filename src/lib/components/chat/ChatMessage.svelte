@@ -17,6 +17,8 @@
 	import UploadedFile from "./UploadedFile.svelte";
 	import TrackioViewChip from "./TrackioViewChip.svelte";
 	import { segmentViewText, viewsInText } from "$lib/utils/trackioView";
+	import { quotesInText, segmentQuoteText, type QuoteTextSegment } from "$lib/utils/paper";
+	import PaperQuoteChip from "./PaperQuoteChip.svelte";
 	import { sidePane } from "$lib/stores/sidePane.svelte";
 
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
@@ -92,6 +94,18 @@
 
 	function handleContentClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
+		// A citation into a paper in the reader: open its tab at the passage.
+		const cite = target.closest?.("a[data-paper-cite]");
+		if (cite instanceof HTMLAnchorElement) {
+			e.preventDefault();
+			e.stopPropagation();
+			const paperId = cite.dataset.paperCite;
+			const page = Number(cite.dataset.page);
+			if (paperId && page >= 1) {
+				sidePane.openPaper(paperId, paperId, { page, quote: cite.dataset.quote });
+			}
+			return;
+		}
 		if (target.tagName === "IMG" && target instanceof HTMLImageElement) {
 			e.preventDefault();
 			e.stopPropagation();
@@ -300,8 +314,19 @@
 	);
 	let displayContent = $derived(slackParts?.request ?? message.content);
 	let contentSegments = $derived(
-		segmentViewText(displayContent.trim(), message.dashboardViews ?? [])
+		segmentViewText(displayContent.trim(), message.dashboardViews ?? []).flatMap<
+			ReturnType<typeof segmentViewText>[number] | QuoteTextSegment
+		>((segment) =>
+			segment.kind === "text"
+				? segmentQuoteText(segment.text, message.paperQuotes ?? [])
+				: [segment]
+		)
 	);
+	let unplacedQuotes = $derived.by(() => {
+		const quotes = message.paperQuotes ?? [];
+		const placed = quotesInText(displayContent, quotes);
+		return quotes.filter((q) => !placed.includes(q));
+	});
 	let unplacedViews = $derived.by(() => {
 		const views = message.dashboardViews ?? [];
 		const placed = viewsInText(displayContent, views);
@@ -625,6 +650,21 @@
 				</div>
 			{/if}
 
+			{#if unplacedQuotes.length}
+				<div class="flex flex-wrap gap-1.5 px-5" data-exclude-from-copy>
+					{#each unplacedQuotes as quote, index (quote.paperId + quote.page + index)}
+						<PaperQuoteChip
+							{quote}
+							onopen={() =>
+								sidePane.openPaper(quote.paperId, quote.title ?? quote.paperId, {
+									page: quote.page,
+									quote: quote.text,
+								})}
+						/>
+					{/each}
+				</div>
+			{/if}
+
 			{#if slackParts?.context}
 				<details class="px-5 text-sm text-gray-400 dark:text-gray-500" data-exclude-from-copy>
 					<summary
@@ -651,6 +691,15 @@
 											segment.view.dashboardUrl,
 											segment.view.project,
 											segment.view.viewUrl
+										)}
+								/>{:else if segment.kind === "quote"}<PaperQuoteChip
+									quote={segment.quote}
+									inline
+									onopen={() =>
+										sidePane.openPaper(
+											segment.quote.paperId,
+											segment.quote.title ?? segment.quote.paperId,
+											{ page: segment.quote.page, quote: segment.quote.text }
 										)}
 								/>{:else}{segment.text}{/if}{/each}
 					</p>

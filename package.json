@@ -116,6 +116,7 @@
 		"openai": "^4.44.0",
 		"openid-client": "^5.4.2",
 		"parquetjs": "^0.11.2",
+		"pdfjs-dist": "6.4.299",
 		"pino": "^9.0.0",
 		"pino-pretty": "^11.0.0",
 		"polka": "^0.5.2",

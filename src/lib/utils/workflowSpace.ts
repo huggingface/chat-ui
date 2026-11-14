@@ -85,6 +85,10 @@ export async function fetchZeroGpuHeaders(
 /**
  * Answers a framed workflow Space as the Hub's Space page would. As on the Hub,
  * a Space the viewer doesn't own gets the inference token only after `consent`.
+ *
+ * `shown` says whether the frame is the one the user is looking at: a workflow
+ * kept in a background tab gets no token and asks for no consent, so it can
+ * never open a dialog over whatever tab is showing.
  */
 export function workflowTokenHandler({
 	frame,
@@ -92,16 +96,18 @@ export function workflowTokenHandler({
 	spaceId,
 	viewer,
 	consent,
+	shown = () => true,
 }: {
 	frame: () => MessageEventSource | null | undefined;
 	origin: string;
 	spaceId: string;
 	viewer: string | undefined;
 	consent: (ask: boolean) => boolean | Promise<boolean>;
+	shown?: () => boolean;
 }): (event: MessageEvent) => Promise<void> {
 	const owned = !!viewer && spaceId.split("/")[0] === viewer;
 	const session = crypto.randomUUID();
-	const visible = () => !globalThis.document?.hidden;
+	const visible = () => !globalThis.document?.hidden && shown();
 	let allowed: Promise<boolean> | undefined;
 	let jwt: Promise<{ token: string; exp: number } | null> | undefined;
 	let zeroGpu: { at: number; headers: Promise<Record<string, string>> } | undefined;
