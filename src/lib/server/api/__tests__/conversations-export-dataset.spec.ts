@@ -20,6 +20,7 @@ vi.mock("@huggingface/hub", async (importOriginal) => ({
 	commit: vi.fn(),
 	createRepo: vi.fn(async () => ({ repoUrl: "" })),
 	datasetInfo: vi.fn(),
+	fileExists: vi.fn(async () => true),
 }));
 
 const hub = await import("@huggingface/hub");
@@ -105,7 +106,7 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 		expect((await res.json()).repo).toBe("alice/traces");
 	});
 
-	it("commits the trace to <last 6 of id>.json with the user token", async () => {
+	it("commits the session trace to <last 6 of id>.jsonl with the user token", async () => {
 		const { locals } = await signedIn();
 		const conv = await createTestConversation(locals, {
 			mlAssistant: true,
@@ -113,7 +114,7 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 		});
 		const res = await push(locals, conv._id.toString(), { repo: "alice/hf-chat-traces" });
 
-		const path = `${conv._id.toString().slice(-6)}.json`;
+		const path = `${conv._id.toString().slice(-6)}.jsonl`;
 		expect(await res.json()).toEqual({
 			repo: "alice/hf-chat-traces",
 			path,
@@ -128,12 +129,31 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 		});
 		const [operation] = call.operations;
 		expect(operation).toMatchObject({ operation: "addOrUpdate", path });
-		const trace = JSON.parse(await (operation as { content: Blob }).content.text());
-		expect(trace).toMatchObject({
-			format: "chat-ui-conversation-trace",
-			conversation: { id: conv._id.toString(), title: "Fine-tune SmolLM" },
+		const [header] = (await (operation as { content: Blob }).content.text())
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		expect(header).toMatchObject({
+			type: "session",
+			harness: "chat-ui",
+			id: conv._id.toString(),
+			name: "Fine-tune SmolLM",
 		});
+		// the dataset already has a card
+		expect(call.operations).toHaveLength(1);
 		expect(hub.createRepo).not.toHaveBeenCalled();
+	});
+
+	it("adds the trace viewer card to a dataset that has none", async () => {
+		const { locals } = await signedIn();
+		const conv = await createTestConversation(locals);
+		vi.mocked(hub.fileExists).mockResolvedValueOnce(false);
+
+		await push(locals, conv._id.toString(), { repo: "alice/hf-chat-traces" });
+
+		const [, card] = vi.mocked(hub.commit).mock.calls[0][0].operations;
+		expect(card).toMatchObject({ operation: "addOrUpdate", path: "README.md" });
+		expect(await (card as { content: Blob }).content.text()).toContain("viewer_mode: traces");
 	});
 
 	it("keeps the same path after the conversation is renamed", async () => {
@@ -145,8 +165,8 @@ describe.sequential("POST /api/v2/conversations/[id]/export/dataset", () => {
 
 		const paths = vi.mocked(hub.commit).mock.calls.map(([call]) => call.operations[0].path);
 		expect(paths).toEqual([
-			`${conv._id.toString().slice(-6)}.json`,
-			`${conv._id.toString().slice(-6)}.json`,
+			`${conv._id.toString().slice(-6)}.jsonl`,
+			`${conv._id.toString().slice(-6)}.jsonl`,
 		]);
 	});
 

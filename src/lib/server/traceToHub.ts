@@ -2,6 +2,7 @@ import {
 	commit,
 	createRepo,
 	datasetInfo,
+	fileExists,
 	HubApiError,
 	type RepoDesignation,
 } from "@huggingface/hub";
@@ -33,6 +34,29 @@ export type TracePushResult =
 	| { ok: true; url: string; created: boolean; private: boolean }
 	| { ok: false; status: number; message: string; code?: "public-dataset" };
 
+/** the card is what puts the dataset in the Hub's trace viewer, the front matter is its switch */
+const TRACE_DATASET_CARD = `---
+viewer_mode: traces
+pretty_name: Chat traces
+tags:
+- agent-traces
+- format:agent-traces
+- traces
+configs:
+- config_name: default
+  default: true
+  data_files:
+  - split: train
+    path:
+    - '*.jsonl'
+---
+
+# Chat traces
+
+Chat sessions pushed from the share menu, one \`.jsonl\` file per conversation in the Hub's
+[Session Traces Format](https://huggingface.co/docs/hub/session-traces-format).
+`;
+
 const statusOf = (err: unknown) => (err instanceof HubApiError ? err.statusCode : undefined);
 
 async function visibility(name: string, accessToken: string) {
@@ -55,7 +79,7 @@ export async function pushTraceToDataset(params: {
 }): Promise<TracePushResult> {
 	const { repo: name, accessToken, path, content, title, allowPublic } = params;
 	const repo: RepoDesignation = { type: "dataset", name };
-	const write = () =>
+	const write = (withCard: boolean) =>
 		commit({
 			repo,
 			accessToken,
@@ -64,10 +88,25 @@ export async function pushTraceToDataset(params: {
 				{
 					operation: "addOrUpdate",
 					path,
-					content: new Blob([content], { type: "application/json" }),
+					content: new Blob([content], { type: "application/jsonl" }),
 				},
+				...(withCard
+					? [
+							{
+								operation: "addOrUpdate" as const,
+								path: "README.md",
+								content: new Blob([TRACE_DATASET_CARD], { type: "text/markdown" }),
+							},
+						]
+					: []),
 			],
 		});
+	// a card someone wrote is theirs, only a dataset without one gets ours
+	const lacksCard = () =>
+		fileExists({ repo, path: "README.md", accessToken }).then(
+			(exists) => !exists,
+			() => false
+		);
 
 	let created = false;
 	// set while the Hub is refusing to create the dataset, not to write to one
@@ -90,9 +129,9 @@ export async function pushTraceToDataset(params: {
 				throw err;
 			});
 			created = true;
-			await afterCreate(write);
+			await afterCreate(() => write(true));
 		} else {
-			await write();
+			await write(await lacksCard());
 		}
 		return {
 			ok: true,

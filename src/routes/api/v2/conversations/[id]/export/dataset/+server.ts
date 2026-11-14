@@ -4,6 +4,7 @@ import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { resolveConversation } from "$lib/server/api/utils/resolveConversation";
 import { getUserHubWriteToken } from "$lib/server/apiToken";
 import { buildConversationTrace } from "$lib/server/conversationTrace";
+import { toSessionTrace } from "$lib/server/sessionTrace";
 import { pushTraceToDataset, traceRepoSchema } from "$lib/server/traceToHub";
 import { traceDatasetFile } from "$lib/utils/traceDatasetFile";
 
@@ -32,7 +33,7 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 		repo,
 		accessToken,
 		path,
-		content: JSON.stringify(trace, null, 2),
+		content: toSessionTrace(trace),
 		title: conversation.title,
 		allowPublic,
 	});

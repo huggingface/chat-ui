@@ -1,2 +1,2 @@
 /** where a conversation's trace lands in the dataset, the same file on every push */
-export const traceDatasetFile = (conversationId: string) => `${conversationId.slice(-6)}.json`;
+export const traceDatasetFile = (conversationId: string) => `${conversationId.slice(-6)}.jsonl`;
