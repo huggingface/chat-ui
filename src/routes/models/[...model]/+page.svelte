@@ -43,10 +43,13 @@
 	async function createConversation(message: string) {
 		try {
 			loading = true;
+			// Every initial-send path arrives here, including prompt examples. Use the
+			// toggle rather than a composer-only latch so those paths create the mode.
+			const isMlAssistant = mlAssistant.enabled;
 
 			// The mode runs on its own fixed set; the server enforces this too.
 			const model =
-				mlAssistant.taskStarted &&
+				isMlAssistant &&
 				data.mlAssistantModels.length > 0 &&
 				!data.mlAssistantModels.includes(modelId)
 					? data.mlAssistantModels[0]
@@ -62,21 +65,22 @@
 						($settings.customPromptsEnabled?.[modelId] ?? true)
 							? $settings.customPrompts[modelId]
 							: "",
-					// The composer latches the mode before handing the message over, so
-					// the conversation this creates is marked with it from the start.
-					mlAssistant: mlAssistant.taskStarted,
+					mlAssistant: isMlAssistant,
 				}),
 			});
 
 			if (!res.ok) {
 				error.set("Error while creating conversation, try again.");
 				console.error("Error while creating conversation: " + (await res.text()));
-				// The composer latched the mode for a conversation that never happened.
 				mlAssistant.abortTask();
 				return;
 			}
 
 			const { conversationId } = await res.json();
+
+			// Only lock the toggle once the server accepted the marked conversation.
+			// This keeps a failed create retryable while covering non-composer sends.
+			if (isMlAssistant) mlAssistant.startTask();
 
 			// Pass the first message text via SvelteKit history state (JSON-serializable).
 			// File objects are not serializable, so they are stored in a client-side Map
@@ -93,9 +97,7 @@
 				title: "New Chat",
 				model,
 				updatedAt: new Date(),
-				// Latched before the create request, so the sidebar row carries the
-				// mode's designation from the moment it appears.
-				mlAssistant: mlAssistant.taskStarted,
+				mlAssistant: isMlAssistant,
 			});
 			await goto(`${base}/conversation/${conversationId}`, {
 				state: { pendingMessage: message, pendingFilesNonce },
@@ -103,7 +105,6 @@
 		} catch (err) {
 			error.set(ERROR_MESSAGES.default);
 			console.error(err);
-			// The composer latched the mode for a conversation that never happened.
 			mlAssistant.abortTask();
 		} finally {
 			loading = false;
