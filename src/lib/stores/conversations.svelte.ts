@@ -35,7 +35,7 @@ interface ConversationListItem {
 	mlAssistant?: boolean;
 }
 
-class ConversationsStore {
+export class ConversationsStore {
 	#list = $state<ConvSidebar[]>([]);
 
 	get list(): ConvSidebar[] {
@@ -65,6 +65,17 @@ class ConversationsStore {
 	/** Prepend a new conversation to the top of the list. */
 	prepend(conv: ConvSidebar): void {
 		this.#list = [conv, ...this.#list];
+	}
+
+	/**
+	 * Append a page of older conversations loaded by the sidebar's infinite scroll.
+	 * Skips ids already in the list: pages shift when a conversation is created or
+	 * deleted, and the mobile and desktop sidebars paginate independently.
+	 */
+	append(conversations: ConvSidebar[]): void {
+		const known = new Set(this.#list.map((c) => String(c.id)));
+		const older = conversations.filter((c) => !known.has(String(c.id)));
+		if (older.length) this.#list = [...this.#list, ...older];
 	}
 
 	/**
