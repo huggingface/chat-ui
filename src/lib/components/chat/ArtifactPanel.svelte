@@ -30,10 +30,10 @@
 	import MarkdownRenderer from "./MarkdownRenderer.svelte";
 	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 	import ExternalLinkModal from "../ExternalLinkModal.svelte";
-	import HtmlPreviewModal from "../HtmlPreviewModal.svelte";
 	import DeployToSpaceModal from "./DeployToSpaceModal.svelte";
 	import ScreenshotAnnotationModal from "./ScreenshotAnnotationModal.svelte";
 
+	import CarbonClose from "~icons/carbon/close";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonCamera from "~icons/carbon/camera";
@@ -423,7 +423,13 @@
 	}
 
 	// ----- actions -----
+	// Fullscreen promotes the panel's own iframe to a viewport-filling overlay
+	// with CSS alone. It must stay the same element: remounting (or reparenting,
+	// which is why a portaled modal can't be used here) reloads the document and
+	// throws away the artifact's runtime state — scroll, form input, game
+	// progress — which should survive entering and leaving fullscreen.
 	let fullscreenOpen = $state(false);
+	let fullscreenEl: HTMLElement | undefined = $state();
 
 	// Fullscreen and a running generation hold Escape, so it does not also close the pane.
 	$effect(() => {
@@ -436,6 +442,32 @@
 	let livePreviewSupported = $derived(
 		!!version && version.complete && version.type !== "markdown" && version.type !== "code"
 	);
+	// A new version streaming in (or the artifact disappearing) unmounts the
+	// preview, and the whole view can go away under the overlay too: the pane
+	// closes (on mobile, confirming a screenshot annotation closes it) or
+	// another side-pane view takes the tab. Leave fullscreen with them: a
+	// stuck-true fullscreenOpen would keep holding Escape and resurrect the
+	// overlay the next time the artifact view shows.
+	$effect(() => {
+		if (fullscreenOpen && (!srcdoc || !sidePane.open || sidePane.view !== "artifact")) {
+			fullscreenOpen = false;
+		}
+	});
+	// The preview is on screen for the preview tab, or for fullscreen opened
+	// from the code tab (where it mounts fresh).
+	let previewShown = $derived(!!srcdoc && (effectiveTab === "preview" || fullscreenOpen));
+	// Every (re)mount of the preview starts a fresh document, but only srcdoc
+	// changes run the reset effects above — so a remount with the same srcdoc
+	// (switching away to the code tab and back, or opening fullscreen from the
+	// code tab) would keep the previous run's captured errors and a stale
+	// previewLoaded. Reset both when the preview comes back on screen. Toggling
+	// fullscreen from the preview tab doesn't re-run this (previewShown stays
+	// true), which is what keeps captured errors carrying into fullscreen.
+	$effect(() => {
+		if (!previewShown) return;
+		errors = [];
+		previewLoaded = false;
+	});
 	// Bumped to remount the iframe, restarting the preview with a fresh document
 	let previewReloadNonce = $state(0);
 	function refreshPreview() {
@@ -509,6 +541,80 @@
 			version.complete &&
 			isDeployableKind(version.type)
 	);
+
+	// Fullscreen Escape listens in the capture phase, ahead of the pane frame's
+	// bubble-phase Escape-to-close (which holdEscape above already suppresses)
+	// and of handlers like the conversation page's Esc-stops-generation, which
+	// preventDefaults while streaming and would otherwise leave the overlay
+	// stuck open. Registered only while fullscreen is up; the external-link
+	// confirm opened from a preview registers its own capture listener later
+	// (it mounts later), so deferring to it here keeps Esc dismissing just the
+	// confirm.
+	$effect(() => {
+		if (!fullscreenOpen) return;
+		const closeOnEscape = (e: KeyboardEvent) => {
+			if (e.key !== "Escape" || e.defaultPrevented) return;
+			if (externalLinkUrl) return; // the confirm's own listener handles it
+			e.preventDefault();
+			fullscreenOpen = false;
+		};
+		window.addEventListener("keydown", closeOnEscape, { capture: true });
+		return () => window.removeEventListener("keydown", closeOnEscape, { capture: true });
+	});
+
+	// While fullscreen is up, everything behind the overlay is made inert —
+	// each ancestor's siblings, walking up to the #app root — so the browser's
+	// own sequential focus navigation is confined to the overlay. A keydown
+	// Tab trap on this window could not do that: keydown inside the sandboxed
+	// iframe stays in that browsing context, so Shift+Tab from the iframe's
+	// first focusable would back out into the obscured panel chrome. The walk
+	// stops below #app, leaving body-level portals (the external-link confirm)
+	// interactive above the overlay; elements already inert are skipped (the
+	// pane host keeps background keep-alive tabs inert) so cleanup restores
+	// exactly what this effect changed.
+	$effect(() => {
+		if (!fullscreenOpen) return;
+		const boundary = document.getElementById("app") ?? document.body;
+		const madeInert: HTMLElement[] = [];
+		for (
+			let node: HTMLElement | null = fullscreenEl ?? null;
+			node && node !== boundary && node.parentElement;
+			node = node.parentElement
+		) {
+			for (const sibling of node.parentElement.children) {
+				if (sibling !== node && sibling instanceof HTMLElement && !sibling.inert) {
+					sibling.inert = true;
+					madeInert.push(sibling);
+				}
+			}
+		}
+		return () => {
+			for (const el of madeInert) el.inert = false;
+		};
+	});
+
+	// The overlay is a dialog rendered in place, so it manages focus itself:
+	// move focus onto it when it opens and hand it back to the trigger
+	// (usually the maximize button) when it closes. The trigger is captured in
+	// openFullscreen, before any effect runs: the inert effect above blurs the
+	// header the trigger sits in, so by effect time activeElement is already
+	// the body.
+	let fullscreenReturnEl: HTMLElement | null = null;
+	function openFullscreen() {
+		const active = document.activeElement;
+		fullscreenReturnEl = active instanceof HTMLElement ? active : null;
+		fullscreenOpen = true;
+	}
+	$effect(() => {
+		if (!fullscreenOpen) return;
+		fullscreenEl?.focus();
+		return () => {
+			// The inert effect's cleanup has already run (creation order), so the
+			// trigger is focusable again
+			if (fullscreenReturnEl?.isConnected) fullscreenReturnEl.focus();
+			fullscreenReturnEl = null;
+		};
+	});
 
 	const tabBase =
 		"rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40";
@@ -613,7 +719,7 @@
 						type="button"
 						class="btn rounded-md p-1.5 text-xs hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
 						title="Open fullscreen"
-						onclick={() => (fullscreenOpen = true)}
+						onclick={openFullscreen}
 					>
 						<CarbonMaximize />
 					</button>
@@ -637,23 +743,6 @@
 						<MarkdownRenderer content={version.content} />
 					</div>
 				</div>
-			{:else if srcdoc}
-				<!-- Backing matches the panel theme so opening the preview doesn't flash
-				     white in dark mode while the document paints its own background;
-				     keyed so the refresh action can remount it for a fresh document -->
-				{#key previewReloadNonce}
-					<iframe
-						bind:this={iframeEl}
-						title="Artifact preview"
-						class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
-						sandbox={PREVIEW_SANDBOX}
-						allow={PREVIEW_ALLOW}
-						allowfullscreen
-						referrerpolicy="no-referrer"
-						onload={() => (previewLoaded = true)}
-						{srcdoc}
-					></iframe>
-				{/key}
 			{/if}
 		{:else}
 			<!-- Same .prose pre styling as chat code blocks so the syntax theme matches
@@ -707,6 +796,80 @@
 					class="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t from-white/90 to-transparent dark:from-gray-900/90"
 				></div>
 			{/if}
+		{/if}
+
+		<!-- Live iframe preview. Rendered whenever it should be on screen — the
+		     preview tab, or fullscreen opened from the code tab — and promoted to
+		     a viewport-filling overlay by a class swap alone when fullscreen: the
+		     iframe node survives the toggle, so the document keeps its runtime
+		     state (a separate modal would rebuild it from scratch). z-30 clears
+		     the pane frame's own chrome (resize handle z-20) on desktop and sits
+		     at the mobile pane's own layer; portaled modals (z-40 at the root
+		     stacking context) still stack above it. -->
+		{#if previewShown}
+			<div
+				bind:this={fullscreenEl}
+				role={fullscreenOpen ? "dialog" : undefined}
+				aria-modal={fullscreenOpen ? true : undefined}
+				aria-label={fullscreenOpen ? "Fullscreen artifact preview" : undefined}
+				tabindex="-1"
+				class="bg-white outline-hidden dark:bg-gray-900 {fullscreenOpen
+					? 'fixed inset-0 z-30'
+					: 'absolute inset-0'}"
+			>
+				<!-- Backing matches the panel theme so opening the preview doesn't flash
+				     white in dark mode while the document paints its own background;
+				     keyed so the refresh action can remount it for a fresh document -->
+				{#key previewReloadNonce}
+					<iframe
+						bind:this={iframeEl}
+						title="Artifact preview"
+						class="h-full w-full bg-white dark:bg-gray-900 {resizing ? 'pointer-events-none' : ''}"
+						sandbox={PREVIEW_SANDBOX}
+						allow={PREVIEW_ALLOW}
+						allowfullscreen
+						referrerpolicy="no-referrer"
+						onload={() => (previewLoaded = true)}
+						{srcdoc}
+					></iframe>
+				{/key}
+				{#if fullscreenOpen}
+					<div class="absolute top-4 right-6 flex items-center gap-1.5">
+						<button
+							type="button"
+							class="btn flex h-7 items-center rounded-lg border border-gray-500/60 bg-gray-800 px-2 text-xs text-white shadow-xs backdrop-blur-sm transition-none hover:border-gray-500 hover:bg-gray-700 active:shadow-inner disabled:cursor-not-allowed disabled:opacity-50"
+							title="Refresh preview"
+							disabled={capturing}
+							onclick={refreshPreview}
+						>
+							<CarbonRenew class="size-3.5" />
+						</button>
+						<button
+							type="button"
+							class="btn flex h-7 items-center gap-1 rounded-lg border border-gray-500/60 bg-gray-800 px-2 text-xs text-white shadow-xs backdrop-blur-sm transition-none hover:border-gray-500 hover:bg-gray-700 active:shadow-inner"
+							title="Close preview (Esc)"
+							onclick={() => (fullscreenOpen = false)}
+						>
+							<CarbonClose class="size-3.5" />
+							Close preview
+						</button>
+					</div>
+					{#if errors.length > 0 && onsend && !loading}
+						<button
+							type="button"
+							class="absolute right-4 bottom-4 btn flex items-center gap-2 rounded-full border-2 border-red-500/60 bg-red-800/90 px-4 py-1.5 text-sm text-white shadow-lg"
+							title="Send the errors and ask for a fix"
+							onclick={() => {
+								// Leave fullscreen only once the message is actually on its
+								// way, so the errors backing the request stay up otherwise
+								if (sendFixRequest(composeFixRequest(errors))) fullscreenOpen = false;
+							}}
+						>
+							<span>Error caught ({errors.length}) — ask to fix</span>
+						</button>
+					{/if}
+				{/if}
+			</div>
 		{/if}
 	</div>
 
@@ -803,17 +966,6 @@
 	<div class="flex h-full min-h-0 flex-col" aria-label="Artifact panel">
 		{@render panelContent(resizing)}
 	</div>
-{/if}
-
-{#if fullscreenOpen && version}
-	<!-- The modal can't render a disabled state for its floating error button,
-	     so streaming gates the handler entirely -->
-	<HtmlPreviewModal
-		html={version.content}
-		kind={version.type}
-		onclose={() => (fullscreenOpen = false)}
-		onsend={onsend && !loading ? sendFixRequest : undefined}
-	/>
 {/if}
 
 {#if externalLinkUrl}

@@ -61,15 +61,26 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-{#if isDesktop.current}
-	<aside
-		bind:this={asideEl}
-		class="pointer-events-auto relative z-10 flex h-full flex-none flex-col overflow-hidden border-l border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
-		style="width: {sidePane.widthPx !== null
-			? `${sidePane.widthPx}px`
-			: SIDE_PANE_DEFAULT_FRACTION}; min-width: max(20%, 300px); max-width: 80%;"
-		aria-label={label}
-	>
+<!-- One persistent container reshaped by breakpoint classes, NOT two
+     alternate branches: a branch swap would remount the children — and any
+     live document in them (artifact iframe, Trackio dashboard, PDF) — so
+     crossing the 768px breakpoint (e.g. rotating a tablet) would reload them
+     and lose their state. Desktop: resizable side column. Mobile: viewport
+     overlay with dialog semantics. -->
+<aside
+	bind:this={asideEl}
+	role={isDesktop.current ? undefined : "dialog"}
+	class="pointer-events-auto flex flex-col bg-white dark:bg-gray-900 {isDesktop.current
+		? 'relative z-10 h-full flex-none overflow-hidden border-l border-gray-100 dark:border-gray-800'
+		: 'fixed inset-0 z-30'}"
+	style={isDesktop.current
+		? `width: ${
+				sidePane.widthPx !== null ? `${sidePane.widthPx}px` : SIDE_PANE_DEFAULT_FRACTION
+			}; min-width: max(20%, 300px); max-width: 80%;`
+		: ""}
+	aria-label={label}
+>
+	{#if isDesktop.current}
 		<!-- resize handle (drag to resize, double-click to reset) -->
 		<div
 			role="separator"
@@ -83,14 +94,6 @@
 			onpointercancel={onResizeEnd}
 			ondblclick={() => sidePane.resetWidth()}
 		></div>
-		{@render children(resizing)}
-	</aside>
-{:else}
-	<div
-		class="pointer-events-auto fixed inset-0 z-30 flex flex-col bg-white dark:bg-gray-900"
-		role="dialog"
-		aria-label={label}
-	>
-		{@render children(false)}
-	</div>
-{/if}
+	{/if}
+	{@render children(isDesktop.current && resizing)}
+</aside>
