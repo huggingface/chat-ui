@@ -19,6 +19,8 @@ export interface TextGenerationContext {
 	forceTools?: boolean;
 	/** Inference provider preference: "auto", "fastest", "cheapest", or a specific provider name */
 	provider?: string;
+	/** provider is the model's default rather than anyone's pick, so it may be routed around when down */
+	providerIsDefault?: boolean;
 	/** Optional thinking-effort override forwarded as `reasoning_effort` to OpenAI-compatible endpoints */
 	reasoningEffort?: "low" | "medium" | "high";
 	/** Per-model user override for reasoning; wins over the model's supportsReasoning flag in both directions */
@@ -27,4 +29,8 @@ export interface TextGenerationContext {
 	artifactsOverride?: boolean;
 	locals: App.Locals | undefined;
 	abortController: AbortController;
+	/** Also identifies the audience for an MCP elicitation raised mid tool call. */
+	generationId?: string;
+	/** The assistant message this run writes into; a durable prompt resumes against it. */
+	messageId?: string;
 }

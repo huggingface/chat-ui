@@ -1,4 +1,4 @@
-import type { Conversation } from "$lib/types/Conversation";
+import type { Conversation, StoredHistoryWindow } from "$lib/types/Conversation";
 import type { Message } from "$lib/types/Message";
 import type {
 	TextGenerationStreamOutput,
@@ -9,6 +9,10 @@ import { z } from "zod";
 import { endpointOAIParametersSchema, endpointOai } from "./openai/endpointOai";
 import type { BackendModel } from "$lib/server/models";
 import type { ObjectId } from "mongodb";
+import type {
+	AttachmentMode,
+	AttachmentReport,
+} from "$lib/server/textGeneration/utils/attachmentBudget";
 
 export type EndpointMessage = Omit<Message, "id">;
 
@@ -23,10 +27,17 @@ export interface EndpointParameters {
 	abortSignal?: AbortSignal;
 	/** Inference provider preference: "auto", "fastest", "cheapest", or a specific provider name */
 	provider?: string;
+	/** provider is the model's default rather than anyone's pick, so it may be routed around when down */
+	providerIsDefault?: boolean;
 	/** Optional thinking-effort, forwarded as OpenAI `reasoning_effort` when set */
 	reasoningEffort?: "low" | "medium" | "high";
 	/** Per-model user override for reasoning; wins over the model's supportsReasoning flag in both directions */
 	reasoningOverride?: boolean;
+	historyWindow?: StoredHistoryWindow;
+	/** minimal after the provider refused the request for its size */
+	attachments?: AttachmentMode;
+	/** what of the attachments this request carries, told to the user when something was cut */
+	onAttachments?: (report: AttachmentReport) => void;
 }
 
 export type TextGenerationStreamOutputSimplified = TextGenerationStreamOutput & {

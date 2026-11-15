@@ -8,6 +8,8 @@ import endpoints from "../endpoints/endpoints";
 import type { ProcessedModel } from "../models";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
+import { upstreamErrorCode } from "$lib/server/endpoints/openai/providerFallback";
+import { routedProvider } from "$lib/server/requestProvider";
 import { heuristicSelectRoute, MULTIMODAL_ROUTE, AGENTIC_ROUTE } from "./heuristics";
 import { getRoutes, resolveRouteModels } from "./policy";
 import { getApiToken } from "$lib/server/apiToken";
@@ -17,6 +19,7 @@ import {
 	pickToolsCapableModel,
 } from "./toolsRoute";
 import { getConfiguredMultimodalModelId } from "./multimodal";
+import { toLegacyShape } from "$lib/utils/messageShape";
 
 const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
@@ -37,11 +40,18 @@ async function getModels(): Promise<ProcessedModel[]> {
 class HTTPError extends Error {
 	constructor(
 		message: string,
-		public statusCode?: number
+		public statusCode?: number,
+		public errorCode?: string
 	) {
 		super(message);
 		this.name = "HTTPError";
 	}
+}
+
+function upstreamHTTPError(err: unknown, message: string, statusCode?: number): Error {
+	return statusCode
+		? new HTTPError(message, statusCode, upstreamErrorCode(err))
+		: new Error(message);
 }
 
 /**
@@ -90,10 +100,11 @@ function stripReasoningBlocks(text: string): string {
 }
 
 function stripReasoningFromMessage(message: EndpointMessage): EndpointMessage {
+	const legacy = toLegacyShape(message);
 	const content =
-		typeof message.content === "string" ? stripReasoningBlocks(message.content) : message.content;
+		typeof legacy.content === "string" ? stripReasoningBlocks(legacy.content) : legacy.content;
 	return {
-		...message,
+		...legacy,
 		content,
 	};
 }
@@ -138,7 +149,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 				} as ProcessedModel;
 			}
 
-			return endpoints.openai({
+			const ep = await endpoints.openai({
 				type: "openai",
 				baseURL: (config.OPENAI_BASE_URL || "https://router.huggingface.co/v1").replace(/\/$/, ""),
 				apiKey: getApiToken(params.locals),
@@ -146,6 +157,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 				// Ensure streaming path is used
 				streamingSupported: true,
 			});
+			return (callParams) => ep({ ...callParams, ...routedProvider(modelForCall) });
 		}
 
 		// Yield router metadata for immediate UI display, using the actual candidate
@@ -197,7 +209,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 					},
 					"[router] multimodal model failed"
 				);
-				throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+				throw upstreamHTTPError(e, message, statusCode);
 			}
 		}
 
@@ -234,7 +246,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 					} else {
 						logger.error(logData, "[router] tools model failed");
 					}
-					throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+					throw upstreamHTTPError(e, message, statusCode);
 				}
 			}
 			// No tools-capable model found — continue with default routing
@@ -280,6 +292,6 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		// Exhausted all candidates — throw to signal upstream failure
 		// Forward the upstream error to the client
 		const { message, statusCode } = extractUpstreamError(lastErr);
-		throw statusCode ? new HTTPError(message, statusCode) : new Error(message);
+		throw upstreamHTTPError(lastErr, message, statusCode);
 	};
 }

@@ -3,6 +3,34 @@ import type { RouterExample } from "./routerExamples";
 // Examples that showcase MCP tool capabilities (web search, Hugging Face, etc.)
 export const mcpExamples: RouterExample[] = [
 	{
+		title: "Doodle Jump game",
+		artifact: true,
+		prompt:
+			"Create a Doodle Jump game in a single HTML file using Canvas: a bouncy character that auto-jumps on platforms, arrow keys to move left and right with screen wrap-around, endless procedurally generated platforms, a camera that scrolls up with the player, and a score based on height.",
+		followUps: [
+			{
+				title: "Jetpack power-up",
+				prompt:
+					"Add a jetpack power-up that spawns on random platforms and rockets the player upward for 3 seconds with a particle trail",
+			},
+			{
+				title: "Crumbling platforms",
+				prompt:
+					"Add brown platforms that crumble when you land on them and moving platforms that slide left and right",
+			},
+			{
+				title: "Monsters",
+				prompt:
+					"Add flying monsters you can defeat by bouncing on their heads, with game over if you touch them from the side",
+			},
+			{
+				title: "Boing sound",
+				prompt:
+					"Add a satisfying boing sound on every bounce using the Web Audio API, and save the high score in localStorage",
+			},
+		],
+	},
+	{
 		title: "Generate an image",
 		prompt: "Generate an image of a zebra in front of a volcanic eruption",
 	},

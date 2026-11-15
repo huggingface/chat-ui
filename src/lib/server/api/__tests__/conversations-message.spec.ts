@@ -173,6 +173,33 @@ describe.sequential("DELETE /api/v2/conversations/[id]/message/[messageId]", () 
 		}
 	});
 
+	it("throws 404 for a share id, even when the message is in the snapshot", async () => {
+		const { locals } = await createTestUser();
+		const tree = buildMessageTree();
+		await collections.sharedConversations.insertOne({
+			_id: "Z7ytzER",
+			hash: "shared-hash",
+			title: "Shared",
+			model: "test-model",
+			messages: tree.messages,
+			rootMessageId: tree.rootId,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+
+		try {
+			await DELETE({
+				locals,
+				params: { id: "Z7ytzER", messageId: tree.msg1Id },
+			} as never);
+			expect.fail("Should have thrown");
+		} catch (e: unknown) {
+			expect((e as { status: number }).status).toBe(404);
+		}
+		const snapshot = await collections.sharedConversations.findOne({ _id: "Z7ytzER" });
+		expect(snapshot?.messages).toHaveLength(tree.messages.length);
+	});
+
 	it("throws 401 for unauthenticated request", async () => {
 		const locals = createTestLocals({ sessionId: undefined, user: undefined });
 

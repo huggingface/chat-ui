@@ -1,0 +1,1423 @@
+/**
+ * An answered `ask_user_question`, end to end: the real conversation route parks the turn,
+ * the real answer endpoint records the answer, and the server continues the turn with no
+ * second request from a browser. Only the OpenAI-compatible upstream and the MCP edges are
+ * scripted (same placement as replayRoundTrip.spec.ts), so what is asserted is what a
+ * provider would actually be sent after the answer.
+ */
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { ObjectId } from "mongodb";
+import { collections, ready } from "$lib/server/database";
+import {
+	cleanupTestData,
+	createTestConversation,
+	createTestUser,
+} from "$lib/server/api/__tests__/testHelpers";
+import {
+	MessageElicitationUpdateType,
+	MessageToolUpdateType,
+	MessageUpdateType,
+} from "$lib/types/MessageUpdate";
+import type { Conversation } from "$lib/types/Conversation";
+import type { Message } from "$lib/types/Message";
+import {
+	streamFor,
+	type ChatMessage,
+	type Round,
+} from "$lib/server/textGeneration/__tests__/replayHarness";
+
+const mocks = vi.hoisted(() => ({
+	create: vi.fn(),
+	/** The servers each run resolved its tools from, in order. */
+	toolServers: [] as Array<Array<{ name: string; url: string; headers?: Record<string, string> }>>,
+}));
+
+vi.mock("openai", async (importOriginal) => ({
+	...(await importOriginal<typeof import("openai")>()),
+	OpenAI: class {
+		chat = { completions: { create: mocks.create } };
+	},
+}));
+vi.mock("$lib/utils/mlAssistantFlag", () => ({ ML_ASSISTANT_MODE: true }));
+vi.mock("$lib/server/mcp/registry", () => ({
+	getMcpServers: () => [{ name: "Configured", url: "https://configured.test/mcp" }],
+	loadMcpServersOnStartup: () => [],
+}));
+vi.mock("$lib/server/urlSafety", async (importOriginal) => ({
+	...(await importOriginal<typeof import("$lib/server/urlSafety")>()),
+	isValidUrl: () => true,
+}));
+vi.mock("$lib/server/mcp/tools", () => ({
+	getOpenAiToolsForMcp: async (servers: (typeof mocks.toolServers)[number]) => {
+		mocks.toolServers.push(servers);
+		return { tools: [], mapping: {} };
+	},
+	resetMcpToolsCache: () => {},
+}));
+vi.mock("$lib/server/mcp/httpClient", () => ({
+	callMcpTool: vi.fn(),
+	getMcpToolTimeoutMs: () => 2_000,
+}));
+vi.mock("$lib/server/mcp/clientPool", () => ({ getClient: async () => ({}) }));
+vi.mock("@huggingface/hub", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@huggingface/hub")>()),
+	commit: vi.fn(async () => ({
+		commit: { oid: "abc123", url: "https://huggingface.co/datasets/pngwn/gold/commit/abc123" },
+		hookOutput: "",
+	})),
+	fileExists: vi.fn(async () => false),
+	datasetInfo: vi.fn(async () => ({ sha: "head1" })),
+}));
+vi.mock("$lib/server/logger", () => ({
+	logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), trace: vi.fn() },
+}));
+
+const { POST } = await import("../../../../routes/conversation/[id]/+server");
+const { POST: ANSWER } = await import("../../../../routes/conversation/[id]/elicitation/+server");
+const { submitElicitationAnswer, claimElicitationResume, RESUME_LEASE_MS } =
+	await import("$lib/server/mcp/elicitation");
+const { sweepAnsweredAsks, resumeAnsweredAsk } = await import("../askResume");
+
+const MODEL_ID = "test-org/test-model";
+
+const ASK: Round = {
+	toolCalls: [
+		{
+			id: "call_ask",
+			name: "ask_user_question",
+			arguments: JSON.stringify({
+				questions: [
+					{
+						question: "Which database should the pipeline write to?",
+						header: "Database",
+						multiSelect: false,
+						options: [
+							{ label: "Postgres", description: "Relational." },
+							{ label: "Mongo", description: "Document." },
+						],
+					},
+				],
+			}),
+		},
+	],
+};
+
+function scriptRounds(rounds: Round[]) {
+	let next = 0;
+	mocks.create.mockImplementation(async () => {
+		const round = rounds[next++];
+		if (!round) throw new Error(`upstream called ${next}x but only ${rounds.length} scripted`);
+		return streamFor(round);
+	});
+}
+
+function outgoing(n: number): ChatMessage[] {
+	const call = mocks.create.mock.calls[n];
+	if (!call) throw new Error(`no upstream request #${n} (saw ${mocks.create.mock.calls.length})`);
+	return call[0].messages as ChatMessage[];
+}
+
+const toolResultsIn = (messages: ChatMessage[]): string[] =>
+	messages.filter((m) => m.role === "tool").map((m) => String(m.content));
+
+async function newConversation() {
+	const { locals } = await createTestUser();
+	const rootId = crypto.randomUUID();
+	const conv = await createTestConversation(locals, {
+		model: MODEL_ID,
+		title: "t",
+		mlAssistant: true,
+		rootMessageId: rootId,
+		messages: [
+			{
+				id: rootId,
+				from: "system",
+				content: "",
+				ancestors: [],
+				children: [],
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			},
+		],
+	});
+	return { conv, locals };
+}
+
+async function reload(conv: Conversation): Promise<Conversation> {
+	const fresh = await collections.conversations.findOne({ _id: conv._id });
+	if (!fresh) throw new Error("conversation vanished");
+	return fresh;
+}
+
+const lastAssistant = (conv: Conversation): Message => {
+	const message = conv.messages.findLast((m) => m.from === "assistant");
+	if (!message) throw new Error("no assistant message");
+	return message;
+};
+
+async function post(conv: Conversation, locals: App.Locals, data: Record<string, unknown>) {
+	const form = new FormData();
+	form.set("data", JSON.stringify(data));
+	const response = await POST({
+		request: new Request(`http://localhost/conversation/${conv._id}`, {
+			method: "POST",
+			body: form,
+		}),
+		locals,
+		params: { id: conv._id.toString() },
+		getClientAddress: () => "127.0.0.1",
+	} as never);
+	if (response.status !== 200) {
+		throw new Error(`POST returned ${response.status}: ${await response.text()}`);
+	}
+	// Draining the body is what lets the route's final save run. Read chunk by chunk: the
+	// route enqueues strings, which `text()` refuses.
+	const reader = response.body?.getReader();
+	if (!reader) throw new Error("no response body");
+	let body = "";
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) return body;
+		body += typeof value === "string" ? value : new TextDecoder().decode(value);
+	}
+}
+
+const sendMessage = async (conv: Conversation, locals: App.Locals, prompt: string) =>
+	post(conv, locals, { inputs: prompt, id: (await reload(conv)).messages.at(-1)?.id });
+
+/** Run a turn that parks on a question; returns the open prompt's id. */
+async function parkOnQuestion(conv: Conversation, locals: App.Locals): Promise<string> {
+	await sendMessage(conv, locals, "Build me a pipeline.");
+	const row = await collections.mcpElicitations.findOne({ conversationId: conv._id });
+	if (!row) throw new Error("the turn did not park on a question");
+	expect(row.status).toBe("pending");
+	return row.elicitationId;
+}
+
+async function answerOverHttp(
+	conv: Conversation,
+	locals: App.Locals,
+	elicitationId: string,
+	body: Record<string, unknown> = { action: "accept", content: { q1: "Postgres" } }
+): Promise<Response> {
+	try {
+		return await ANSWER({
+			request: new Request(`http://localhost/conversation/${conv._id}/elicitation`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ elicitationId, ...body }),
+			}),
+			locals,
+			params: { id: conv._id.toString() },
+		} as never);
+	} catch (err) {
+		// SvelteKit's `error()` throws; outside the framework nothing turns it into a response.
+		const status = (err as { status?: unknown } | null)?.status;
+		if (typeof status !== "number") throw err;
+		return new Response(null, { status });
+	}
+}
+
+/** Record an answer the way a process that then dies does: no continuation started. */
+const answerAndDie = (conv: Conversation, elicitationId: string) =>
+	submitElicitationAnswer({
+		elicitationId,
+		conversationId: conv._id,
+		action: "accept",
+		content: { q1: "Postgres" },
+	});
+
+const turnStatus = async (conv: Conversation, messageId: string) =>
+	(await collections.turnStates.findOne({ conversationId: conv._id, messageId }))?.status;
+
+/**
+ * The turn reached `status` and no producer is still writing. The state flips before the
+ * final save (in every producer), so the state alone would let a test read a stale message.
+ */
+const turnIs = (conv: Conversation, messageId: string, status: string) =>
+	vi.waitFor(
+		async () => {
+			expect(await turnStatus(conv, messageId)).toBe(status);
+			expect(
+				await collections.generations.countDocuments({
+					conversationId: conv._id,
+					status: "running",
+				})
+			).toBe(0);
+		},
+		{ timeout: 10_000, interval: 25 }
+	);
+
+const settlements = (message: Message, elicitationId: string) =>
+	(message.updates ?? []).filter(
+		(u) =>
+			u.type === MessageUpdateType.Elicitation &&
+			u.subtype === MessageElicitationUpdateType.Resolved &&
+			u.elicitationId === elicitationId
+	);
+
+const toolResults = (message: Message) =>
+	(message.updates ?? []).filter(
+		(u) => u.type === MessageUpdateType.Tool && u.subtype === MessageToolUpdateType.Result
+	);
+
+const backdate = (elicitationId: string, ms: number) =>
+	collections.mcpElicitations.updateOne(
+		{ elicitationId },
+		{ $set: { resolvedAt: new Date(Date.now() - ms) } }
+	);
+
+beforeAll(async () => {
+	await ready;
+});
+
+beforeEach(() => {
+	mocks.create.mockReset();
+	mocks.toolServers.length = 0;
+});
+
+afterEach(async () => {
+	await cleanupTestData();
+	await Promise.all([
+		collections.mcpElicitations.deleteMany({}),
+		collections.turnStates.deleteMany({}),
+		collections.generations.deleteMany({}),
+		collections.generationEvents.deleteMany({}),
+	]);
+});
+
+describe("an answered question", () => {
+	it("is continued by the server, with no second request from the browser", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "Postgres it is." }]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		expect(await turnStatus(conv, parked.id)).toBe("awaiting_input");
+
+		const response = await answerOverHttp(conv, locals, elicitationId);
+
+		// `resume` is the instruction to the client to start the continuation.
+		expect(await response.json()).toEqual({ ok: true, resume: false, messageId: parked.id });
+		await turnIs(conv, parked.id, "done");
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain("Which database should the pipeline write to?");
+		expect(result).toContain("Postgres");
+
+		const message = lastAssistant(await reload(conv));
+		expect(message.id).toBe(parked.id);
+		expect(message.content).toContain("Postgres it is.");
+		expect(settlements(message, elicitationId)).toHaveLength(1);
+		expect(toolResults(message)).toHaveLength(1);
+		// A fresh stamp is how a browser that was not watching finds the run.
+		expect(message.generationId).not.toBe(parked.generationId);
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resume: { status: "resumed", attempts: 1 },
+		});
+	});
+
+	it("has its answer stored before the model is called", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+
+		let storedWhenCalled: Message | undefined;
+		mocks.create.mockImplementation(async () => {
+			storedWhenCalled = lastAssistant(await reload(conv));
+			return streamFor({ content: "ok" });
+		});
+		await answerOverHttp(conv, locals, elicitationId);
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+
+		if (!storedWhenCalled) throw new Error("the model was never called");
+		expect(settlements(storedWhenCalled, elicitationId)).toHaveLength(1);
+		expect(toolResults(storedWhenCalled)).toHaveLength(1);
+	});
+
+	it("runs once however many submits, tabs and old clients ask for it", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "Postgres it is." }]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+
+		// A double click, a second tab, and a client from before this change making the
+		// second request it was built to make — all at once.
+		const [first, second, oldClient] = await Promise.all([
+			answerOverHttp(conv, locals, elicitationId),
+			answerOverHttp(conv, locals, elicitationId),
+			answerOverHttp(conv, locals, elicitationId).then(async (answered) => ({
+				answered,
+				body: await post(conv, locals, { resumeElicitationId: elicitationId, id: parked.id }),
+			})),
+		]);
+		await turnIs(conv, parked.id, "done");
+
+		// One answer lands; which of the three is the race.
+		expect([first.status, second.status, oldClient.answered.status].sort()).toEqual([
+			200, 409, 409,
+		]);
+		// Whoever took the claim ran the turn, and nobody else did. Usually that is the answer
+		// endpoint and the old client is streamed nothing; when its request gets there first
+		// it runs the turn itself, as it always has, and the endpoint's attempt is the miss.
+		const streamedToOldClient = oldClient.body.includes("Postgres");
+		expect(oldClient.body === "" || streamedToOldClient).toBe(true);
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		const message = lastAssistant(await reload(conv));
+		expect(settlements(message, elicitationId)).toHaveLength(1);
+		expect(toolResults(message)).toHaveLength(1);
+		expect(message.content.match(/Postgres it is\./g)).toHaveLength(1);
+	});
+
+	it("does not let an old client's request disturb a run the server started", async () => {
+		const { conv, locals } = await newConversation();
+		let release: () => void = () => {};
+		const held = new Promise<void>((resolve) => (release = resolve));
+		scriptRounds([ASK]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		mocks.create.mockImplementation(async () => {
+			await held;
+			return streamFor({ content: "Postgres it is." });
+		});
+
+		await answerOverHttp(conv, locals, elicitationId);
+		const running = lastAssistant(await reload(conv));
+		const body = await post(conv, locals, { resumeElicitationId: elicitationId, id: parked.id });
+
+		expect(body).toBe("");
+		// The route stamps a generation and rewrites every message before it runs; a lost
+		// claim has to stop it short of both.
+		expect(lastAssistant(await reload(conv)).generationId).toBe(running.generationId);
+		release();
+		await turnIs(conv, parked.id, "done");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+	});
+
+	it("runs on the tools the answering browser has selected", async () => {
+		// The selection used to arrive with the client's resume request. Without it the
+		// resumed round drops servers only the browser knows and brings back ones the user
+		// switched off, so the model finds its tools changed halfway through a turn.
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "Postgres it is." }]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+
+		await answerOverHttp(conv, locals, elicitationId, {
+			action: "accept",
+			content: { q1: "Postgres" },
+			selectedMcpServerNames: ["Mine"],
+			selectedMcpServers: [
+				{
+					name: "Mine",
+					url: "https://mine.test/mcp",
+					headers: [{ key: "Authorization", value: "Bearer browser-held" }],
+				},
+			],
+			timezone: "Europe/Paris",
+		});
+		await turnIs(conv, parked.id, "done");
+
+		const resumed = mocks.toolServers.at(-1) ?? [];
+		expect(resumed.map((server) => server.name)).toContain("Mine");
+		expect(resumed.map((server) => server.name)).not.toContain("Configured");
+		expect(resumed.find((server) => server.name === "Mine")?.headers).toEqual({
+			Authorization: "Bearer browser-held",
+		});
+		// In the request only: the row is the one place this could have been parked.
+		expect(
+			JSON.stringify(await collections.mcpElicitations.findOne({ elicitationId }))
+		).not.toContain("browser-held");
+	});
+
+	it("can be stopped from another pod while it waits on the model", async () => {
+		// A Stop served elsewhere reaches this process only as a marker in the database, and
+		// the generation loop looks at its cached copy only between model outputs.
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		mocks.create.mockImplementation(
+			(_body: unknown, options?: { signal?: AbortSignal }) =>
+				new Promise((_resolve, reject) => {
+					options?.signal?.addEventListener("abort", () =>
+						reject(Object.assign(new Error("Request was aborted."), { name: "AbortError" }))
+					);
+				})
+		);
+
+		await answerOverHttp(conv, locals, elicitationId);
+		await vi.waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2), { timeout: 10_000 });
+		const now = new Date();
+		await collections.abortedGenerations.insertOne({
+			_id: new ObjectId(),
+			conversationId: conv._id,
+			createdAt: now,
+			updatedAt: now,
+		});
+		await turnIs(conv, parked.id, "done");
+
+		const message = lastAssistant(await reload(conv));
+		expect(message.interrupted).toBe(true);
+		expect(
+			(await collections.generations.find({ conversationId: conv._id }).toArray()).map(
+				(generation) => generation.status
+			)
+		).toContain("interrupted");
+		// Consumed, or it would trip the watcher of this conversation's next turn.
+		expect(await collections.abortedGenerations.countDocuments({ conversationId: conv._id })).toBe(
+			0
+		);
+	});
+
+	it("follows the same path when the user declines", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "I will assume Postgres." }]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+
+		await answerOverHttp(conv, locals, elicitationId, { action: "decline" });
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+
+		expect(toolResultsIn(outgoing(1))[0]).toContain("The user declined to answer.");
+	});
+
+	it("starts the continuation a repeat answer finds missing", async () => {
+		// Reloaded page, question shows open again, user answers a second time: the earlier
+		// answer stands and this submit is what gets it continued — now by the server.
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "Postgres it is." }]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await answerAndDie(conv, elicitationId);
+
+		const repeat = await answerOverHttp(conv, locals, elicitationId, { action: "decline" });
+
+		expect(repeat.status).toBe(409);
+		expect(await repeat.json()).toMatchObject({
+			answered: { action: "accept", resume: false, messageId: parked.id },
+		});
+		await turnIs(conv, parked.id, "done");
+		expect(toolResultsIn(outgoing(1))[0]).toContain("Postgres");
+	});
+});
+
+describe("the sweep for answers nothing continued", () => {
+	it("continues an answer whose process died before it could", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "Postgres it is." }]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await answerAndDie(conv, elicitationId);
+		await backdate(elicitationId, 60_000);
+
+		await Promise.all([sweepAnsweredAsks(), sweepAnsweredAsks()]);
+		await turnIs(conv, parked.id, "done");
+
+		// No browser, so no selection: the configured servers, as a parked wait resumes on.
+		expect((mocks.toolServers.at(-1) ?? []).map((server) => server.name)).toContain("Configured");
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(toolResultsIn(outgoing(1))[0]).toContain("Postgres");
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resume: { status: "resumed", attempts: 1 },
+		});
+	});
+
+	it("leaves an answer the endpoint may still be continuing", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		await answerAndDie(conv, elicitationId);
+
+		await sweepAnsweredAsks();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect((await collections.mcpElicitations.findOne({ elicitationId }))?.resume).toBeUndefined();
+	});
+
+	it("leaves old answers alone, so shipping it does not wake weeks of dropped turns", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		await answerAndDie(conv, elicitationId);
+		await backdate(elicitationId, 2 * 60 * 60_000);
+
+		await sweepAnsweredAsks();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect((await collections.mcpElicitations.findOne({ elicitationId }))?.resume).toBeUndefined();
+	});
+
+	it("does not re-run a turn that was continued before claims existed", async () => {
+		// Every answer the browser-driven resume did continue looks like this: the answer is
+		// in the transcript and the row has never been claimed. The first sweep after this
+		// ships sees an hour of them.
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "Postgres it is." }]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await answerOverHttp(conv, locals, elicitationId);
+		await turnIs(conv, parked.id, "done");
+		await collections.mcpElicitations.updateOne({ elicitationId }, { $unset: { resume: "" } });
+		await backdate(elicitationId, 60_000);
+
+		await sweepAnsweredAsks();
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resume: { status: "resumed", attempts: 1 },
+		});
+		expect(await sweepAnsweredAsks().then(() => mocks.create.mock.calls.length)).toBe(2);
+	});
+
+	it("backs off a producer that holds the turn without a claim, and does not count it", async () => {
+		// A pod from before this change, mid-deploy: it runs the old client's resume request
+		// without claiming, and for its first seconds has stored nothing to go by.
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await answerAndDie(conv, elicitationId);
+		await backdate(elicitationId, 60_000);
+		const now = new Date();
+		await collections.generations.insertOne({
+			_id: new ObjectId(),
+			generationId: crypto.randomUUID(),
+			conversationId: conv._id,
+			messageId: parked.id,
+			status: "running",
+			seq: 0,
+			lastHeartbeatAt: now,
+			startedAt: now,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		for (let pass = 0; pass < 5; pass += 1) await sweepAnsweredAsks();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		// Never walked up to the ceiling: abandoning would fail a turn that is running fine.
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resume: { status: "resuming", attempts: 0 },
+		});
+		expect(await turnStatus(conv, parked.id)).toBe("awaiting_input");
+	});
+
+	it("takes over a claim whose holder died before storing the answer", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "Postgres it is." }]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await answerAndDie(conv, elicitationId);
+		await backdate(elicitationId, 10 * 60_000);
+		expect(await claimElicitationResume(conv._id, elicitationId)).not.toBeNull();
+
+		// Held: a live claim is never stolen.
+		await sweepAnsweredAsks();
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId },
+			{ $set: { "resume.takenAt": new Date(Date.now() - RESUME_LEASE_MS - 1_000) } }
+		);
+		await sweepAnsweredAsks();
+		await turnIs(conv, parked.id, "done");
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resume: { status: "resumed", attempts: 2 },
+		});
+	});
+
+	it("delivers the answer once when the first holder stored it and died before the model call", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "Postgres it is." }]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await answerAndDie(conv, elicitationId);
+		await backdate(elicitationId, 10 * 60_000);
+		// What that holder left: the answer in the transcript, the claim held and lapsed.
+		const row = await collections.mcpElicitations.findOne({ elicitationId });
+		if (!row) throw new Error("row vanished");
+		const { resumeParkedToolCall } = await import("$lib/server/mcp/resumeElicitation");
+		const delivered = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId,
+			claimed: row,
+		});
+		await collections.conversations.updateOne({ _id: conv._id, "messages.id": parked.id }, {
+			$push: { "messages.$.updates": { $each: delivered.updates } },
+		} as never);
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId },
+			{
+				$set: {
+					resume: {
+						status: "resuming",
+						attempts: 1,
+						takenAt: new Date(Date.now() - RESUME_LEASE_MS - 1_000),
+					},
+				},
+			}
+		);
+
+		await sweepAnsweredAsks();
+		await turnIs(conv, parked.id, "done");
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		const message = lastAssistant(await reload(conv));
+		expect(settlements(message, elicitationId)).toHaveLength(1);
+		expect(toolResults(message)).toHaveLength(1);
+		expect(message.content).toContain("Postgres it is.");
+	});
+
+	it("never re-runs a turn whose claim was left open by a failed consuming write", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "Postgres it is." }]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await answerOverHttp(conv, locals, elicitationId);
+		await turnIs(conv, parked.id, "done");
+		await backdate(elicitationId, 10 * 60_000);
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId },
+			{
+				$set: {
+					"resume.status": "resuming",
+					"resume.takenAt": new Date(Date.now() - RESUME_LEASE_MS - 1_000),
+				},
+			}
+		);
+
+		await sweepAnsweredAsks();
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resume: { status: "resumed" },
+		});
+	});
+
+	it("gives up after repeated failures and closes the turn", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await answerAndDie(conv, elicitationId);
+		await backdate(elicitationId, 10 * 60_000);
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId },
+			{
+				$set: {
+					resume: {
+						status: "resuming",
+						attempts: 3,
+						takenAt: new Date(Date.now() - RESUME_LEASE_MS - 1_000),
+					},
+				},
+			}
+		);
+
+		await sweepAnsweredAsks();
+
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resume: { status: "abandoned", attempts: 4 },
+		});
+		// `awaiting_input` reads alive forever; nothing is coming for this turn.
+		expect(await turnStatus(conv, parked.id)).toBe("failed");
+	});
+});
+
+describe("a new message after an answer nothing continued", () => {
+	it("gets the answer into history first, never an interrupted call", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "SQLite, then." }]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await answerAndDie(conv, elicitationId);
+
+		await sendMessage(conv, locals, "Actually, never mind: use SQLite.");
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		const results = toolResultsIn(outgoing(1));
+		expect(results).toHaveLength(1);
+		expect(results[0]).toContain("The user answered");
+		expect(results[0]).toContain("Postgres");
+		expect(results[0]).not.toContain("interrupted before a result was recorded");
+
+		const fresh = await reload(conv);
+		const settled = fresh.messages.find((m) => m.id === parked.id);
+		if (!settled) throw new Error("parked message vanished");
+		expect(settlements(settled, elicitationId)).toHaveLength(1);
+		expect(toolResults(settled)).toHaveLength(1);
+		expect(lastAssistant(fresh).content).toContain("SQLite, then.");
+		// Closed, so the old turn does not read alive behind the new one.
+		expect(await turnStatus(conv, parked.id)).toBe("done");
+
+		// And consumed: the sweep must not now run the old turn underneath the new one.
+		await backdate(elicitationId, 60_000);
+		await sweepAnsweredAsks();
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resume: { status: "resumed" },
+		});
+	});
+
+	it("records a late answer without running the turn the user has moved on from", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([ASK, { content: "SQLite, then." }]);
+		const elicitationId = await parkOnQuestion(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await sendMessage(conv, locals, "Actually, never mind: use SQLite.");
+
+		await answerOverHttp(conv, locals, elicitationId);
+
+		expect(await resumeAnsweredAsk({ conversationId: conv._id, elicitationId })).toEqual({
+			outcome: "not_claimed",
+		});
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		const settled = (await reload(conv)).messages.find((m) => m.id === parked.id);
+		if (!settled) throw new Error("parked message vanished");
+		expect(settlements(settled, elicitationId)).toHaveLength(1);
+		expect(toolResults(settled)).toHaveLength(1);
+		expect(await turnStatus(conv, parked.id)).toBe("done");
+	});
+});
+
+const { POST: SUBMIT_REVIEW } =
+	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/submit/+server");
+const { PATCH: PATCH_REVIEW } =
+	await import("../../../../routes/api/v2/conversations/[id]/reviews/[reviewId]/+server");
+const { completeSubmission } = await import("$lib/server/mlReviews/submission");
+const { submitReview } = await import("$lib/server/mlReviews/store");
+const { acquireLock, isDBLocked, releaseLock } = await import("$lib/migrations/lock");
+
+const REVIEW: Round = {
+	toolCalls: [
+		{
+			id: "call_review",
+			name: "request_review",
+			arguments: JSON.stringify({
+				title: "Triage batch 1",
+				source: {
+					records: [
+						{ id: "gh-1", body: "Crash on empty prompt" },
+						{ id: "gh-2", body: "Add dark mode" },
+					],
+				},
+				fields: [{ name: "body", type: "text" }],
+				questions: [
+					{
+						name: "kind",
+						type: "label",
+						required: true,
+						options: [{ value: "bug" }, { value: "feature" }],
+					},
+				],
+				suggestions: "after_answer",
+			}),
+		},
+	],
+};
+
+async function parkOnReview(conv: Conversation, locals: App.Locals) {
+	await sendMessage(conv, locals, "Show me the issues to label.");
+	const row = await collections.mcpElicitations.findOne({ conversationId: conv._id });
+	if (row?.pending?.kind !== "review") throw new Error("the turn did not park on a review");
+	expect(row.status).toBe("pending");
+	return { elicitationId: row.elicitationId, reviewId: row.pending.reviewId };
+}
+
+const reviewRoute = async <T>(
+	run: () => Response | Promise<Response>
+): Promise<{ status: number; body: T }> => {
+	try {
+		const response = await run();
+		return { status: response.status, body: (await response.json()) as T };
+	} catch (err) {
+		const status = (err as { status?: unknown } | null)?.status;
+		if (typeof status !== "number") throw err;
+		return { status, body: undefined as T };
+	}
+};
+
+const routeArgs = (conv: Conversation, locals: App.Locals, reviewId: string, body: unknown) => ({
+	request: new Request("http://localhost/review", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(body),
+	}),
+	locals,
+	params: { id: conv._id.toString(), reviewId },
+});
+
+async function labelAll(conv: Conversation, locals: App.Locals, reviewId: string) {
+	for (const [index, kind] of ["bug", "feature"].entries()) {
+		const patched = await reviewRoute(() =>
+			PATCH_REVIEW(
+				routeArgs(conv, locals, reviewId, {
+					index,
+					draft: {
+						status: "answered",
+						answers: { kind },
+						comments:
+							index === 0 ? [{ id: "c1", field: "body", body: "repro needs a stack trace" }] : [],
+					},
+				}) as never
+			)
+		);
+		expect(patched.status).toBe(200);
+	}
+}
+
+const submitOverHttp = (conv: Conversation, locals: App.Locals, reviewId: string) =>
+	reviewRoute<Record<string, unknown>>(() =>
+		SUBMIT_REVIEW(
+			routeArgs(conv, locals, reviewId, {
+				note: "Fix the scraper first.",
+			}) as never
+		)
+	);
+
+async function submitAndDie(conv: Conversation, reviewId: string, elicitationId: string) {
+	const review = await collections.mlReviews.findOne({ conversationId: conv._id });
+	if (!review) throw new Error("no review");
+	const submission = { note: "Fix the scraper first." };
+	expect(await submitReview(review, submission)).toBe(true);
+	const claimed = await collections.mlReviews.findOne({ _id: review._id });
+	if (!claimed) throw new Error("no review");
+	expect((await completeSubmission(claimed)).resolved).toBe(true);
+	expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+		status: "resolved",
+	});
+	expect(reviewId).toBe(review._id.toString());
+}
+
+const reviewResolutions = (message: Message) =>
+	(message.updates ?? []).filter(
+		(u) => u.type === MessageUpdateType.Review && u.subtype === "resolved"
+	);
+
+describe("a submitted review", () => {
+	it("is continued by the server with the result as the tool message, once for two submits", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "On it: fixing the scraper." }]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		expect(await turnStatus(conv, parked.id)).toBe("awaiting_input");
+		await labelAll(conv, locals, reviewId);
+
+		const [first, second] = await Promise.all([
+			submitOverHttp(conv, locals, reviewId),
+			submitOverHttp(conv, locals, reviewId),
+		]);
+		await turnIs(conv, parked.id, "done");
+
+		// a second submit that reads the review mid claim finishes the same submission instead
+		expect([
+			[200, 200],
+			[200, 409],
+		]).toContainEqual([first.status, second.status].sort());
+		const accepted = [first, second].filter((r) => r.status === 200).map((r) => r.body);
+		for (const body of accepted) {
+			expect(body).toEqual(accepted[0]);
+			expect(body).toMatchObject({ ok: true });
+			expect(body).not.toHaveProperty("delivery");
+		}
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(
+			(await collections.mlReviews.findOne({ _id: new ObjectId(reviewId) }))?.delivery
+		).toBeUndefined();
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain('Review "Triage batch 1" submitted');
+		expect(result).toContain('Note from the user: "Fix the scraper first."');
+		expect(result).toContain("kind: bug 1, feature 1.");
+		expect(result).toContain("- gh-1 body: repro needs a stack trace");
+		expect(result).toContain("v-file://reviews/triage-batch-1.responses.jsonl");
+
+		const message = lastAssistant(await reload(conv));
+		expect(message.id).toBe(parked.id);
+		expect(settlements(message, elicitationId)).toHaveLength(1);
+		expect(toolResults(message)).toHaveLength(1);
+		expect(reviewResolutions(message)).toHaveLength(1);
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resume: { status: "resumed", attempts: 1 },
+		});
+	});
+
+	it("is run by the sweep after a holder persisted its resume updates and died", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "On it." }]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await labelAll(conv, locals, reviewId);
+		await submitAndDie(conv, reviewId, elicitationId);
+		await backdate(elicitationId, 10 * 60_000);
+		const row = await collections.mcpElicitations.findOne({ elicitationId });
+		if (!row) throw new Error("row vanished");
+		const { resumeParkedToolCall } = await import("$lib/server/mcp/resumeElicitation");
+		const delivered = await resumeParkedToolCall({
+			conversationId: conv._id,
+			elicitationId,
+			claimed: row,
+		});
+		expect(delivered.updates.map((u) => [u.type, "subtype" in u ? u.subtype : ""])).toEqual([
+			[MessageUpdateType.Review, "resolved"],
+			[MessageUpdateType.Elicitation, MessageElicitationUpdateType.Resolved],
+			[MessageUpdateType.Tool, MessageToolUpdateType.Result],
+		]);
+		await collections.conversations.updateOne({ _id: conv._id, "messages.id": parked.id }, {
+			$push: { "messages.$.updates": { $each: delivered.updates } },
+		} as never);
+		await collections.mcpElicitations.updateOne(
+			{ elicitationId },
+			{
+				$set: {
+					resume: {
+						status: "resuming",
+						attempts: 1,
+						takenAt: new Date(Date.now() - RESUME_LEASE_MS - 1_000),
+					},
+				},
+			}
+		);
+
+		await sweepAnsweredAsks();
+		await turnIs(conv, parked.id, "done");
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		const message = lastAssistant(await reload(conv));
+		expect(settlements(message, elicitationId)).toHaveLength(1);
+		expect(toolResults(message)).toHaveLength(1);
+		expect(reviewResolutions(message)).toHaveLength(1);
+		expect(message.content).toContain("On it.");
+	});
+
+	it("is settled as the answer when the user sends a message after a submit nothing continued", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Fixing the scraper." }]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		await labelAll(conv, locals, reviewId);
+		await submitAndDie(conv, reviewId, elicitationId);
+
+		await sendMessage(conv, locals, "Did you see my review?");
+
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain('Review "Triage batch 1" submitted');
+		expect(result).not.toContain("still open");
+		expect((await collections.mlReviews.findOne({ conversationId: conv._id }))?.status).toBe(
+			"submitted"
+		);
+	});
+});
+
+describe("a submit that died right after claiming the submission", () => {
+	async function storeOnly(conv: Conversation) {
+		const review = await collections.mlReviews.findOne({ conversationId: conv._id });
+		if (!review) throw new Error("no review");
+		expect(await submitReview(review, {})).toBe(true);
+		await collections.mlReviews.updateOne(
+			{ _id: review._id },
+			{ $set: { submittedAt: new Date(Date.now() - 60_000) } }
+		);
+	}
+
+	it("is continued by the sweep", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Thanks, carrying on." }]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await labelAll(conv, locals, reviewId);
+		await storeOnly(conv);
+
+		await sweepAnsweredAsks();
+		await turnIs(conv, parked.id, "done");
+
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(toolResultsIn(outgoing(1))[0]).toContain('Review "Triage batch 1" submitted');
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			resolution: "user",
+			resume: { status: "resumed" },
+		});
+	});
+
+	it("is settled as the answer, not detached, when the user sends a message", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Carrying on." }]);
+		const { reviewId } = await parkOnReview(conv, locals);
+		await labelAll(conv, locals, reviewId);
+		await storeOnly(conv);
+
+		await sendMessage(conv, locals, "Did that go through?");
+
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain('Review "Triage batch 1" submitted');
+		expect(result).not.toContain("still open");
+	});
+});
+
+describe("a review the user wrote past", () => {
+	async function writePast(rounds: Round[]) {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Waiting for your review." }, ...rounds]);
+		const { elicitationId, reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await sendMessage(conv, locals, "Hold on, first tell me where the issues came from.");
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		return { conv, locals, elicitationId, reviewId, parked };
+	}
+
+	const postedResults = (conv: Conversation) =>
+		conv.messages.filter(
+			(m) => m.from === "user" && m.content.startsWith('Review "Triage batch 1" submitted')
+		);
+
+	it("is closed as still open and detached, never resumed in place", async () => {
+		const { conv, elicitationId, parked } = await writePast([]);
+
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toBe(
+			'Review "Triage batch 1" is still open: 0 of 2 answered, 0 comments. The user wrote instead; the review stays open and its submission will arrive as a user message.'
+		);
+		expect(await turnStatus(conv, parked.id)).toBe("done");
+		expect((await collections.mlReviews.findOne({ conversationId: conv._id }))?.status).toBe(
+			"detached"
+		);
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			status: "resolved",
+			resolution: "withdrawn",
+			resume: { status: "abandoned", abandonedReason: "user wrote instead" },
+		});
+	});
+
+	it("is posted by the server as the user's next message and run, once however often it is submitted", async () => {
+		const { conv, locals, elicitationId, reviewId, parked } = await writePast([
+			{ content: "Thanks, fixing the scraper." },
+		]);
+		await labelAll(conv, locals, reviewId);
+
+		const submitted = await submitOverHttp(conv, locals, reviewId);
+
+		expect(submitted.status).toBe(200);
+		expect(submitted.body).toMatchObject({ ok: true, delivery: "sent" });
+		const after = await reload(conv);
+		await turnIs(conv, lastAssistant(after).id, "done");
+		expect(mocks.create).toHaveBeenCalledTimes(3);
+		const sent = outgoing(2).at(-1);
+		expect(sent?.role).toBe("user");
+		expect(String(sent?.content)).toContain('Review "Triage batch 1" submitted');
+		const fresh = await reload(conv);
+		expect(postedResults(fresh)).toHaveLength(1);
+		expect(lastAssistant(fresh).content).toContain("Thanks, fixing the scraper.");
+		expect(await collections.mlReviews.findOne({ conversationId: conv._id })).toMatchObject({
+			status: "submitted",
+			delivery: { status: "sent", messageId: postedResults(fresh)[0].id },
+		});
+
+		const again = await submitOverHttp(conv, locals, reviewId);
+		expect(again.body).toMatchObject({ ok: true, delivery: "sent" });
+		await backdate(elicitationId, 60_000);
+		await sweepAnsweredAsks();
+		expect(
+			await resumeAnsweredAsk({ conversationId: conv._id, elicitationId, kind: "review" })
+		).toEqual({ outcome: "not_claimed" });
+		expect(mocks.create).toHaveBeenCalledTimes(3);
+		expect(postedResults(await reload(conv))).toHaveLength(1);
+		const settled = (await reload(conv)).messages.find((m) => m.id === parked.id);
+		expect(settled && reviewResolutions(settled)).toHaveLength(0);
+	});
+
+	it("waits while another turn runs, then the sweep posts it", async () => {
+		const { conv, locals, reviewId } = await writePast([{ content: "Thanks." }]);
+		await labelAll(conv, locals, reviewId);
+		const busy = new ObjectId();
+		const now = new Date();
+		await collections.generations.insertOne({
+			_id: busy,
+			generationId: crypto.randomUUID(),
+			conversationId: conv._id,
+			messageId: "other",
+			status: "running",
+			seq: 0,
+			lastHeartbeatAt: now,
+			startedAt: now,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		expect((await submitOverHttp(conv, locals, reviewId)).body).toMatchObject({
+			ok: true,
+			delivery: "queued",
+		});
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(
+			(await collections.mlReviews.findOne({ conversationId: conv._id }))?.delivery
+		).toMatchObject({ status: "pending", attempts: 0 });
+
+		await collections.generations.deleteOne({ _id: busy });
+		await sweepAnsweredAsks();
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		expect(mocks.create).toHaveBeenCalledTimes(3);
+		expect(postedResults(await reload(conv))).toHaveLength(1);
+	});
+
+	it("adopts the message a dead attempt already posted instead of posting it twice", async () => {
+		const { conv, locals, reviewId } = await writePast([{ content: "Thanks." }]);
+		await labelAll(conv, locals, reviewId);
+		await submitOverHttp(conv, locals, reviewId);
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		const posted = postedResults(await reload(conv))[0];
+		await collections.mlReviews.updateOne(
+			{ conversationId: conv._id },
+			{
+				$set: {
+					"delivery.status": "sending",
+					"delivery.takenAt": new Date(Date.now() - 10 * 60_000),
+				},
+				$unset: { "delivery.messageId": "" },
+			}
+		);
+
+		await sweepAnsweredAsks();
+
+		expect(mocks.create).toHaveBeenCalledTimes(3);
+		expect(postedResults(await reload(conv))).toHaveLength(1);
+		expect(
+			(await collections.mlReviews.findOne({ conversationId: conv._id }))?.delivery
+		).toMatchObject({ status: "sent", messageId: posted.id });
+	});
+
+	it("waits for another delivery holding the conversation", async () => {
+		const { conv, locals, reviewId } = await writePast([{ content: "Thanks." }]);
+		await labelAll(conv, locals, reviewId);
+		const key = `review.delivery:${conv._id.toString()}`;
+		const lock = await acquireLock(key);
+		if (!lock) throw new Error("lock not taken");
+
+		expect((await submitOverHttp(conv, locals, reviewId)).body).toMatchObject({
+			ok: true,
+			delivery: "queued",
+		});
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		expect(postedResults(await reload(conv))).toHaveLength(0);
+
+		await releaseLock(key, lock);
+		await sweepAnsweredAsks();
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		expect(mocks.create).toHaveBeenCalledTimes(3);
+		expect(postedResults(await reload(conv))).toHaveLength(1);
+	});
+
+	it("defers, uncounted, while the queue holds the turn start, then posts", async () => {
+		const { conv, locals, reviewId } = await writePast([{ content: "Thanks." }]);
+		await labelAll(conv, locals, reviewId);
+		const key = `queue.drain:${conv._id.toString()}`;
+		const lock = await acquireLock(key);
+		if (!lock) throw new Error("lock not taken");
+
+		expect((await submitOverHttp(conv, locals, reviewId)).body).toMatchObject({
+			ok: true,
+			delivery: "queued",
+		});
+		expect(
+			(await collections.mlReviews.findOne({ conversationId: conv._id }))?.delivery
+		).toMatchObject({ status: "pending", attempts: 0 });
+		expect(postedResults(await reload(conv))).toHaveLength(0);
+
+		await releaseLock(key, lock);
+		await sweepAnsweredAsks();
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		expect(postedResults(await reload(conv))).toHaveLength(1);
+	});
+
+	it("leaves a parked review alone when a send is refused its turn start", async () => {
+		const { conv, locals } = await newConversation();
+		scriptRounds([REVIEW, { content: "Waiting for your review." }]);
+		const { elicitationId } = await parkOnReview(conv, locals);
+		const key = `queue.drain:${conv._id.toString()}`;
+		const lock = await acquireLock(key);
+		if (!lock) throw new Error("lock not taken");
+
+		await expect(sendMessage(conv, locals, "Hold on.")).rejects.toMatchObject({ status: 409 });
+
+		expect(await collections.mcpElicitations.findOne({ elicitationId })).toMatchObject({
+			status: "pending",
+		});
+		expect((await collections.mlReviews.findOne({ conversationId: conv._id }))?.status).toBe(
+			"open"
+		);
+		await releaseLock(key, lock);
+
+		await sendMessage(conv, locals, "Hold on.");
+		expect((await collections.mlReviews.findOne({ conversationId: conv._id }))?.status).toBe(
+			"detached"
+		);
+		expect(await isDBLocked(key)).toBe(false);
+	});
+
+	it("reruns a posted message whose run never started, without posting it again", async () => {
+		const { conv, locals, reviewId } = await writePast([
+			{ content: "Thanks." },
+			{ content: "Thanks, second try." },
+		]);
+		await labelAll(conv, locals, reviewId);
+		await submitOverHttp(conv, locals, reviewId);
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+		const posted = postedResults(await reload(conv))[0];
+		await collections.generations.deleteMany({
+			conversationId: conv._id,
+			messageId: { $in: posted.children ?? [] },
+		});
+		await collections.mlReviews.updateOne(
+			{ conversationId: conv._id },
+			{
+				$set: {
+					"delivery.status": "sending",
+					"delivery.takenAt": new Date(Date.now() - 10 * 60_000),
+				},
+			}
+		);
+
+		await sweepAnsweredAsks();
+		await turnIs(conv, lastAssistant(await reload(conv)).id, "done");
+
+		expect(mocks.create).toHaveBeenCalledTimes(4);
+		const fresh = await reload(conv);
+		expect(postedResults(fresh)).toHaveLength(1);
+		expect(lastAssistant(fresh).content).toContain("Thanks, second try.");
+		const delivery = (await collections.mlReviews.findOne({ conversationId: conv._id }))?.delivery;
+		expect(delivery).toMatchObject({ status: "sent", messageId: posted.id });
+		expect(
+			await collections.generations.countDocuments({ generationId: delivery?.generationId })
+		).toBe(1);
+	});
+});
+
+describe("a submitted review with a destination", () => {
+	const REVIEW_TO_HUB: Round = {
+		toolCalls: (REVIEW.toolCalls ?? []).map((call) => ({
+			...call,
+			arguments: JSON.stringify({
+				...JSON.parse(call.arguments),
+				destination: { repo: "pngwn/gold", path: "data/batch-1.parquet" },
+			}),
+		})),
+	};
+
+	beforeEach(() => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: string | URL) => {
+				const url = String(input);
+				if (url.endsWith("/api/datasets/pngwn/gold")) return Response.json({ private: false });
+				if (url.endsWith("/api/whoami-v2")) {
+					return Response.json({
+						name: "pngwn",
+						orgs: [],
+						auth: { accessToken: { role: "write" } },
+					});
+				}
+				return new Response("not stubbed", { status: 500 });
+			})
+		);
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	async function parkOnPublish() {
+		const { conv, locals } = await newConversation();
+		await collections.sessions.updateOne(
+			{ userId: conv.userId },
+			{ $set: { oauth: { token: { value: "hf_owner" } } } as never }
+		);
+		scriptRounds([REVIEW_TO_HUB, { content: "Labels are on the Hub." }]);
+		const { reviewId } = await parkOnReview(conv, locals);
+		const parked = lastAssistant(await reload(conv));
+		await labelAll(conv, locals, reviewId);
+		expect((await submitOverHttp(conv, locals, reviewId)).status).toBe(200);
+		await turnIs(conv, parked.id, "awaiting_input");
+		const card = await collections.mcpElicitations.findOne({
+			conversationId: conv._id,
+			"pending.publish": { $exists: true },
+		});
+		if (!card) throw new Error("the resumed turn did not park on a publish card");
+		return { conv, locals, parked, card };
+	}
+
+	it("parks on the publish card, then the answer pushes and the model runs", async () => {
+		const { commit } = await import("@huggingface/hub");
+		vi.mocked(commit).mockClear();
+		const { conv, locals, parked, card } = await parkOnPublish();
+		expect(mocks.create).toHaveBeenCalledTimes(1);
+		expect(commit).not.toHaveBeenCalled();
+		const message = lastAssistant(await reload(conv));
+		expect(
+			message.updates?.some(
+				(u) =>
+					u.type === MessageUpdateType.Elicitation &&
+					u.subtype === MessageElicitationUpdateType.Request &&
+					u.request.elicitationId === card.elicitationId
+			)
+		).toBe(true);
+
+		const answered = await answerOverHttp(conv, locals, card.elicitationId, {
+			action: "accept",
+			content: { publish: "push" },
+		});
+		expect(answered.status).toBe(200);
+		await turnIs(conv, parked.id, "done");
+
+		expect(commit).toHaveBeenCalledTimes(1);
+		expect(vi.mocked(commit).mock.calls[0][0]).toMatchObject({ accessToken: "hf_owner" });
+		expect(mocks.create).toHaveBeenCalledTimes(2);
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain("Labels pushed to pngwn/gold (data/batch-1.parquet)");
+	});
+
+	it("takes no ask path when the HTTP endpoint answers a card carrying a budget option", async () => {
+		const { commit } = await import("@huggingface/hub");
+		vi.mocked(commit).mockClear();
+		const { conv, locals, parked, card } = await parkOnPublish();
+		await collections.mcpElicitations.updateOne(
+			{ _id: card._id },
+			{ $set: { "request.fields.0.options.0.setBudgetUsd": 50 } }
+		);
+		const before = (await reload(conv)).mlBudget;
+
+		const answered = await answerOverHttp(conv, locals, card.elicitationId, {
+			action: "accept",
+			content: { publish: "push" },
+		});
+		expect(answered.status).toBe(200);
+		await turnIs(conv, parked.id, "done");
+
+		expect((await reload(conv)).mlBudget).toEqual(before);
+		expect(commit).toHaveBeenCalledTimes(1);
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain("Labels pushed to pngwn/gold (data/batch-1.parquet)");
+		expect(result).not.toContain("The user answered");
+		expect(result).not.toContain("compute budget");
+	});
+
+	it("is pushed by the sweep when the answer's process died", async () => {
+		const { commit } = await import("@huggingface/hub");
+		vi.mocked(commit).mockClear();
+		const { conv, parked, card } = await parkOnPublish();
+		await submitElicitationAnswer({
+			elicitationId: card.elicitationId,
+			conversationId: conv._id,
+			action: "accept",
+			content: { publish: "skip" },
+		});
+		await backdate(card.elicitationId, 60_000);
+
+		await sweepAnsweredAsks();
+		await turnIs(conv, parked.id, "done");
+
+		expect(commit).not.toHaveBeenCalled();
+		const [result] = toolResultsIn(outgoing(1));
+		expect(result).toContain(
+			"Labels were NOT pushed to pngwn/gold (data/batch-1.parquet): the user chose not to push."
+		);
+	});
+});

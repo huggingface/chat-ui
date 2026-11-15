@@ -1,6 +1,7 @@
 import type { ObjectId } from "mongodb";
 import { collections } from "$lib/server/database";
 import { logger } from "$lib/server/logger";
+import { interruptAgentRuns } from "$lib/server/mlRegistry/agentRuns";
 
 export interface ActiveRun {
 	conversationId: ObjectId;
@@ -42,6 +43,36 @@ export async function markGenerationInterrupted(
 			"messages.interrupted": { $ne: true },
 		},
 		{ $set: { "messages.$.interrupted": true, "messages.$.updatedAt": now, updatedAt: now } }
+	);
+	// Nothing is left to poll these, so leaving them pending invites an answer into the void.
+	// Only the blocking kind: a durable prompt is not polled, and its answer continues the
+	// turn whenever it comes, so closing it would turn that answer into a refusal.
+	// Scoped by conversation as well: `generationId` is client-chosen, so on its own it would
+	// let a caller close a prompt belonging to a chat this run has nothing to do with.
+	await collections.mcpElicitations
+		.updateMany(
+			{
+				generationId,
+				conversationId: run.conversationId,
+				status: "pending",
+				pending: { $exists: false },
+			},
+			{
+				$set: {
+					status: "resolved",
+					action: "cancel",
+					resolution: "aborted",
+					resolvedAt: now,
+					updatedAt: now,
+				},
+			}
+		)
+		.catch((err) =>
+			logger.error({ err, generationId }, "[generation] failed to close pending elicitations")
+		);
+	// a sub-agent run ends inside its generation, one still running there never will
+	await interruptAgentRuns(run.conversationId, generationId).catch((err) =>
+		logger.error({ err, generationId }, "[generation] failed to interrupt sub-agent runs")
 	);
 }
 

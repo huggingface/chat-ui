@@ -6,11 +6,22 @@
 		isMessageToolProgressUpdate,
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
-	import { formatToolProgressLabel } from "$lib/utils/toolProgress";
+	import { formatToolProgressCount, formatToolProgressLines } from "$lib/utils/toolProgress";
 	import { ToolResultStatus, type ToolFront } from "$lib/types/Tool";
+	import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
+	import { sidePane } from "$lib/stores/sidePane.svelte";
+	import { formatFileRef } from "$lib/utils/mlRegistry";
+	import { PAPER_MARKER, papersFromToolUpdates } from "$lib/utils/paper";
+	import { callArguments } from "$lib/utils/messageShape";
+	import { redactToolArguments } from "$lib/utils/redactSecrets";
 	import { page } from "$app/state";
+	import { base } from "$app/paths";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
+	import CarbonDocument from "~icons/carbon/document";
+	import CarbonDocumentPdf from "~icons/carbon/document-pdf";
+	import LucideTriangleAlert from "~icons/lucide/triangle-alert";
 	import BlockWrapper from "./BlockWrapper.svelte";
+	import CopyToClipBoardBtn from "../CopyToClipBoardBtn.svelte";
 
 	interface Props {
 		tool: MessageToolUpdate[];
@@ -22,7 +33,20 @@
 	let isOpen = $state(false);
 
 	let toolFnName = $derived(tool.find(isMessageToolCallUpdate)?.call.name);
-	let toolError = $derived(tool.some(isMessageToolErrorUpdate));
+	let fileRefs = $derived(tool.find(isMessageToolCallUpdate)?.fileRefs ?? []);
+	// a paper this call opened in the reader, to get back to it after closing the tab
+	let openedPapers = $derived(papersFromToolUpdates(tool));
+	// only a conversation the registry is bound to has a pane to open, a share has none
+	let canOpenFiles = $derived(mlRegistry.conversationId !== undefined);
+	// A result can come back with an error status as well as a separate error
+	// update; either way the call failed.
+	let toolError = $derived(
+		tool.some(
+			(update) =>
+				isMessageToolErrorUpdate(update) ||
+				(isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error)
+		)
+	);
 	let toolDone = $derived(tool.some(isMessageToolResultUpdate));
 	let isExecuting = $derived(!toolDone && !toolError && loading);
 	let toolProgress = $derived.by(() => {
@@ -32,18 +56,20 @@
 		}
 		return undefined;
 	});
-	let progressLabel = $derived.by(() => formatToolProgressLabel(toolProgress));
+	let progressCount = $derived.by(() => formatToolProgressCount(toolProgress));
+	let progressLines = $derived.by(() => formatToolProgressLines(toolProgress));
+
+	// A training run that syncs to Trackio prints its dashboard URL into the job
+	// output, so the tool group that ran it is also the natural place to get back
+	// to the dashboard after closing the pane.
 
 	const availableTools: ToolFront[] = $derived.by(
 		() => (page.data as { tools?: ToolFront[] } | undefined)?.tools ?? []
 	);
 
 	type ToolOutput = Record<string, unknown>;
-	type McpImageContent = {
-		type: "image";
-		data: string;
-		mimeType: string;
-	};
+	// older results and failed uploads keep inline data
+	type McpImageContent = { type: "image"; mimeType: string } & ({ data: string } | { sha: string });
 
 	const formatValue = (value: unknown): string => {
 		if (value == null) return "";
@@ -68,10 +94,16 @@
 		const obj = value as Record<string, unknown>;
 		return (
 			obj["type"] === "image" &&
-			typeof obj["data"] === "string" &&
-			typeof obj["mimeType"] === "string"
+			typeof obj["mimeType"] === "string" &&
+			(typeof obj["data"] === "string" || typeof obj["sha"] === "string")
 		);
 	};
+
+	// a share is served from the same route under its own id
+	const imageSrc = (image: McpImageContent): string =>
+		"data" in image
+			? `data:${image.mimeType};base64,${image.data}`
+			: `${base}/conversation/${page.params.id}/output/${image.sha}`;
 
 	const getImageBlocks = (output: ToolOutput): McpImageContent[] => {
 		const blocks = output["content"];
@@ -93,47 +125,113 @@
 
 	const parseToolOutputs = (outputs: ToolOutput[]): ParsedToolOutput[] =>
 		outputs.map((output) => ({
-			text: getOutputText(output),
+			// the reader's marker line is for chat-ui, not for the person reading the output
+			text: getOutputText(output)
+				?.split("\n")
+				.filter((line) => !line.startsWith(PAPER_MARKER))
+				.join("\n"),
 			images: getImageBlocks(output),
 			metadata: getMetadataEntries(output),
 		}));
 </script>
 
+{#snippet copyable(text: string, preClass: string)}
+	<div class="group/snippet relative">
+		<pre
+			class="{preClass} rounded-lg p-2 pr-8 font-mono text-xs break-all whitespace-pre-wrap">{text}</pre>
+		<CopyToClipBoardBtn
+			value={text}
+			classNames="btn absolute top-1 right-1 rounded-md p-1 text-gray-400 opacity-0 transition-opacity group-hover/snippet:opacity-100 hover:text-gray-600 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 dark:hover:text-gray-200"
+			iconClassNames="size-3"
+		/>
+	</div>
+{/snippet}
+
 {#if toolFnName}
 	<BlockWrapper>
 		<!-- Header row -->
 		<div class="flex max-w-full flex-col items-start gap-1 select-none">
-			<button
-				type="button"
-				class="group/header flex max-w-full cursor-pointer items-center gap-1 text-left whitespace-nowrap focus:outline-hidden"
-				onclick={() => (isOpen = !isOpen)}
-				aria-label={isOpen ? "Collapse" : "Expand"}
-			>
-				<span
-					class="shrink-0 text-sm font-medium transition-colors {toolError
-						? `group-hover/header:text-red-700 dark:group-hover/header:text-red-300 ${
-								isOpen ? 'text-red-700 dark:text-red-300' : 'text-red-600 dark:text-red-400'
-							}`
-						: `group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 ${
-								isOpen ? 'text-gray-600 dark:text-gray-300' : 'text-gray-500 dark:text-gray-400'
-							}`}"
-					class:router-shimmer={isExecuting}
+			<div class="flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-1">
+				<button
+					type="button"
+					class="group/header flex max-w-full cursor-pointer items-center gap-1 text-left whitespace-nowrap focus:outline-hidden"
+					onclick={() => (isOpen = !isOpen)}
+					aria-label={isOpen ? "Collapse" : "Expand"}
 				>
-					{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
-				</span>
-				<code
-					class="min-w-0 truncate rounded-sm bg-blue-50 px-1 py-px font-mono text-xs text-blue-700 opacity-90 dark:bg-blue-900/30 dark:text-blue-300"
-				>
-					{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
-				</code>
-				<CarbonChevronRight
-					class="size-3.5 shrink-0 transition-all duration-200 group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
-						? 'rotate-90 text-gray-600 dark:text-gray-300'
-						: 'text-gray-400'}"
-				/>
-			</button>
-			{#if isExecuting && toolProgress}
-				<span class="text-xs text-gray-500 dark:text-gray-400">{progressLabel}</span>
+					<!-- Errors here are often recoverable (the model retries or works around
+				     them), so the header stays in the same muted gray as every other
+				     state; the icon is the only signal until the row is expanded.
+				     role="img" is what gets a bare svg's aria-label announced. -->
+					{#if toolError}
+						<LucideTriangleAlert
+							class="size-3.5 shrink-0 text-amber-500 dark:text-amber-400"
+							role="img"
+							aria-label="Failed"
+						/>
+					{/if}
+					<span
+						class="shrink-0 text-sm font-medium transition-colors group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
+							? 'text-gray-600 dark:text-gray-300'
+							: 'text-gray-500 dark:text-gray-400'}"
+						class:router-shimmer={isExecuting}
+					>
+						{toolError ? "Error calling" : toolDone ? "Called" : "Calling"} tool
+					</span>
+					<code
+						class="min-w-0 truncate rounded-sm bg-blue-50 px-1 py-px font-mono text-xs text-blue-700 opacity-90 dark:bg-blue-900/30 dark:text-blue-300"
+					>
+						{availableTools.find((entry) => entry.name === toolFnName)?.displayName ?? toolFnName}
+					</code>
+					{#if isExecuting && progressCount}
+						<span class="shrink-0 text-xs text-gray-500 tabular-nums dark:text-gray-400"
+							>({progressCount})</span
+						>
+					{/if}
+					<CarbonChevronRight
+						class="size-3.5 shrink-0 transition-all duration-200 group-hover/header:text-gray-600 dark:group-hover/header:text-gray-300 {isOpen
+							? 'rotate-90 text-gray-600 dark:text-gray-300'
+							: 'text-gray-400'}"
+					/>
+				</button>
+				{#each openedPapers as paper (paper.id)}
+					<button
+						type="button"
+						class="inline-flex max-w-64 cursor-pointer items-center gap-1 rounded-sm border border-gray-200 px-1 py-px text-xs text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600 dark:hover:text-gray-100"
+						title="Read {paper.title}"
+						onclick={() => sidePane.openPaper(paper.id, paper.title)}
+					>
+						<CarbonDocumentPdf class="size-3 shrink-0" />
+						<span class="truncate">{paper.title}</span>
+					</button>
+				{/each}
+				{#each fileRefs as ref (formatFileRef(ref))}
+					{#if canOpenFiles}
+						<button
+							type="button"
+							class="tool-file-ref inline-flex cursor-pointer items-center gap-1 rounded-sm border border-gray-200 px-1 py-px font-mono text-xs text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-600 dark:hover:text-gray-100"
+							title="Open {formatFileRef(ref)} in the files list"
+							onclick={() => sidePane.openRegistry(ref)}
+						>
+							<CarbonDocument class="size-3 shrink-0" />
+							{formatFileRef(ref)}
+						</button>
+					{:else}
+						<span
+							class="tool-file-ref inline-flex items-center gap-1 rounded-sm border border-gray-200 px-1 py-px font-mono text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400"
+						>
+							<CarbonDocument class="size-3 shrink-0" />
+							{formatFileRef(ref)}
+						</span>
+					{/if}
+				{/each}
+			</div>
+			{#if isExecuting && progressLines.length}
+				<div class="flex min-w-0 flex-col gap-0.5">
+					<!-- Keyed by position: the text is model-provided and parallel calls repeat it (each_key_duplicate). -->
+					{#each progressLines as line, i (i)}
+						<span class="truncate text-xs text-gray-500 dark:text-gray-400">{line}</span>
+					{/each}
+				</div>
 			{/if}
 		</div>
 
@@ -146,18 +244,20 @@
 							<div class="text-[10px] font-semibold text-gray-400 uppercase dark:text-gray-500">
 								Input
 							</div>
-							<pre
-								class="rounded-lg bg-gray-100 p-2 font-mono text-xs break-all whitespace-pre-wrap dark:bg-gray-800/70">{formatValue(
-									update.call.parameters
-								)}</pre>
+							{@render copyable(
+								formatValue(redactToolArguments(callArguments(update))),
+								"bg-gray-100 dark:bg-gray-800/70"
+							)}
 						</div>
 					{:else if update.subtype === MessageToolUpdateType.Error}
 						<div class="space-y-1">
-							<div class="text-[10px] font-semibold text-red-500 uppercase dark:text-red-400">
+							<div class="text-[10px] font-semibold text-amber-600 uppercase dark:text-amber-400">
 								Error
 							</div>
-							<pre
-								class="rounded-lg bg-red-50 p-2 font-mono text-xs break-all whitespace-pre-wrap text-red-600 dark:bg-red-900/20 dark:text-red-400">{update.message}</pre>
+							{@render copyable(
+								update.message,
+								"bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+							)}
 						</div>
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Success && update.result.display}
 						<div class="space-y-1">
@@ -167,8 +267,10 @@
 							{#each parseToolOutputs(update.result.outputs) as parsedOutput}
 								<div class="space-y-2">
 									{#if parsedOutput.text}
-										<pre
-											class="scrollbar-custom max-h-60 overflow-y-auto rounded-lg bg-gray-100 p-2 font-mono text-xs break-all whitespace-pre-wrap dark:bg-gray-800/70">{parsedOutput.text}</pre>
+										{@render copyable(
+											parsedOutput.text,
+											"scrollbar-custom max-h-60 overflow-y-auto bg-gray-100 dark:bg-gray-800/70"
+										)}
 									{/if}
 
 									{#if parsedOutput.images.length > 0}
@@ -177,29 +279,30 @@
 												<img
 													alt={`Tool result image ${imageIndex + 1}`}
 													class="max-h-60 cursor-pointer rounded-sm border border-gray-200 dark:border-gray-700"
-													src={`data:${image.mimeType};base64,${image.data}`}
+													src={imageSrc(image)}
 												/>
 											{/each}
 										</div>
 									{/if}
 
 									{#if parsedOutput.metadata.length > 0}
-										<pre
-											class="rounded-lg bg-gray-100 p-2 font-mono text-xs break-all whitespace-pre-wrap dark:bg-gray-800/70">{formatValue(
-												Object.fromEntries(parsedOutput.metadata)
-											)}</pre>
+										{@render copyable(
+											formatValue(Object.fromEntries(parsedOutput.metadata)),
+											"bg-gray-100 dark:bg-gray-800/70"
+										)}
 									{/if}
 								</div>
 							{/each}
 						</div>
 					{:else if isMessageToolResultUpdate(update) && update.result.status === ToolResultStatus.Error && update.result.display}
 						<div class="space-y-1">
-							<div class="text-[10px] font-semibold text-red-500 uppercase dark:text-red-400">
+							<div class="text-[10px] font-semibold text-amber-600 uppercase dark:text-amber-400">
 								Error
 							</div>
-							<pre
-								class="rounded-lg bg-red-50 p-2 font-mono text-xs break-all whitespace-pre-wrap text-red-600 dark:bg-red-900/20 dark:text-red-400">{update
-									.result.message}</pre>
+							{@render copyable(
+								update.result.message,
+								"bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+							)}
 						</div>
 					{/if}
 				{/each}

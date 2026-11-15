@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { sanitizeJsonSchema, getOpenAiToolsForMcp, resetMcpToolsCache } from "./tools";
 import type { McpServerConfig } from "./httpClient";
+import { logger } from "$lib/server/logger";
+
+vi.mock("$lib/server/config", () => ({ config: { EXA_API_KEY: "exa-secret-key" } }));
 
 // In-memory MCP servers keyed by URL: each listTools call is recorded so tests
 // can assert exactly which servers were (re-)listed vs served from the cache.
@@ -9,9 +12,11 @@ const mcpMock = vi.hoisted(() => ({
 	responses: new Map<string, { tools: unknown[] } | Error>(),
 }));
 
-vi.mock("@modelcontextprotocol/sdk/client", () => ({
+vi.mock("@modelcontextprotocol/client", () => ({
 	Client: class {
 		private url = "";
+		// Session clients register one per declared capability; listing never invokes them.
+		setRequestHandler() {}
 		async connect(transport: { url?: unknown }) {
 			this.url = String(transport.url ?? "");
 		}
@@ -24,18 +29,12 @@ vi.mock("@modelcontextprotocol/sdk/client", () => ({
 		}
 		async close() {}
 	},
-}));
-
-vi.mock("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
 	StreamableHTTPClientTransport: class {
 		url: unknown;
 		constructor(url: unknown) {
 			this.url = url;
 		}
 	},
-}));
-
-vi.mock("@modelcontextprotocol/sdk/client/sse.js", () => ({
 	SSEClientTransport: class {
 		url: unknown;
 		constructor(url: unknown) {
@@ -213,11 +212,14 @@ describe("getOpenAiToolsForMcp per-server cache", () => {
 		expect(first.tools.map((t) => t.function.name)).toEqual(["search"]);
 		expect(first.tools[0].function.parameters).toMatchObject({ type: "object" });
 		expect(second.tools.map((t) => t.function.name)).toEqual(["search"]);
-		expect(second.mapping.search).toEqual({
+		expect(second.mapping.search).toMatchObject({
 			fnName: "search",
 			server: "Server A",
 			tool: "search",
 		});
+		// The server's own schema survives the cache round trip: the preflight
+		// check reads it from here, and it must be the unsanitized one.
+		expect(second.mapping.search?.inputSchema).toEqual(searchTool.inputSchema);
 	});
 
 	it("fetches only servers missing from the cache when the selection grows", async () => {
@@ -393,5 +395,37 @@ describe("getOpenAiToolsForMcp tool annotations", () => {
 
 		expect(mcpMock.listToolsCalls).toEqual([SERVER_A.url]);
 		expect(cached.mapping.search.annotations).toEqual({ destructiveHint: true });
+	});
+});
+
+describe("getOpenAiToolsForMcp logging", () => {
+	beforeEach(() => {
+		resetMcpToolsCache();
+		mcpMock.listToolsCalls.length = 0;
+		mcpMock.responses.clear();
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("never logs the injected Exa key", async () => {
+		const debug = vi.spyOn(logger, "debug");
+		const ok: McpServerConfig = {
+			name: "exa",
+			url: "https://mcp.exa.ai/mcp?exaApiKey=exa-secret-key",
+		};
+		const failing: McpServerConfig = {
+			name: "exa-failing",
+			url: "https://mcp.exa.ai/mcp?tools=web_search_exa&exaApiKey=exa-secret-key",
+		};
+		mcpMock.responses.set(ok.url, { tools: [{ name: "search", inputSchema: {} }] });
+		mcpMock.responses.set(failing.url, new Error(`listing failed for ${failing.url}`));
+
+		await getOpenAiToolsForMcp([ok, failing]);
+
+		const logged = JSON.stringify(debug.mock.calls);
+		expect(logged).toContain("[redacted]");
+		expect(logged).not.toContain("exa-secret-key");
 	});
 });

@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { userEvent } from "@vitest/browser/context";
 import { buildHtmlSrcdoc, PREVIEW_ALLOW, PREVIEW_SANDBOX } from "$lib/utils/previewSrcdoc";
 import { captureArtifactScreenshot } from "$lib/utils/artifactCapture";
 
 type PreviewMessage = {
 	type: string;
 	channel: string;
-	detail?: { href?: string; message?: string };
+	detail?: { href?: string; message?: string; key?: string };
 };
 
 let iframes: HTMLIFrameElement[] = [];
@@ -368,5 +369,75 @@ describe("preview iframe capability grants", () => {
 			POINTER_LOCK_PROBE
 		);
 		expect(String(res.pointerLock)).toMatch(/sandbox/i);
+	});
+});
+
+describe("preview keyboard focus", () => {
+	// Canvas games cancel pointerdown to stop scrolling and text selection,
+	// which also cancels the focus move a click would make: without the hook's
+	// focus grab, arrow keys keep going to the host page even after clicking
+	// the game. Real Playwright input is required here; synthetic events carry
+	// no focus semantics.
+	const CANCELLING_CANVAS =
+		`
+		<canvas id="c" width="300" height="150" style="display:block"></canvas>
+		<script>
+			var c = document.getElementById('c');
+			c.addEventListener('pointerdown', function (e) { e.preventDefault(); });
+			window.addEventListener('keydown', function (e) {
+				parent.postMessage({ type: 'probe.key', channel: CHANNEL, detail: { key: e.key } }, '*');
+			});
+		</scr` + `ipt>`;
+
+	function frameDocument(channel: string): string {
+		return (
+			`<!doctype html><html><head></head><body><script>var CHANNEL=${JSON.stringify(
+				channel
+			)};</scr` + `ipt>${CANCELLING_CANVAS}</body></html>`
+		);
+	}
+
+	function mountFrame(srcdoc: string): Promise<HTMLIFrameElement> {
+		const iframe = document.createElement("iframe");
+		iframe.setAttribute("sandbox", PREVIEW_SANDBOX);
+		iframe.setAttribute("allow", PREVIEW_ALLOW);
+		iframe.style.width = "300px";
+		iframe.style.height = "150px";
+		document.body.appendChild(iframe);
+		iframes.push(iframe);
+		const loaded = new Promise<HTMLIFrameElement>((resolve) =>
+			iframe.addEventListener("load", () => resolve(iframe), { once: true })
+		);
+		iframe.srcdoc = srcdoc;
+		return loaded;
+	}
+
+	/** Click the frame while a text field holds focus (like the composer), then press a key; resolves with the key the frame saw, or undefined if it saw none */
+	async function clickFrameThenPressKey(iframe: HTMLIFrameElement, channel: string) {
+		const composer = document.createElement("input");
+		document.body.appendChild(composer);
+		composer.focus();
+		try {
+			await userEvent.click(iframe);
+			const seen = nextMessage(channel, 1500).then((msg) => msg.detail?.key);
+			await userEvent.keyboard("{ArrowRight}");
+			return await seen.catch(() => undefined);
+		} finally {
+			composer.remove();
+		}
+	}
+
+	it("a click hands the frame keyboard focus even when the artifact cancels pointerdown", async () => {
+		const channel = "test_focus_grab";
+		const iframe = await mountFrame(buildHtmlSrcdoc(frameDocument(channel), channel));
+		expect(await clickFrameThenPressKey(iframe, channel)).toBe("ArrowRight");
+		expect(document.activeElement).toBe(iframe);
+	});
+
+	it("control: without the hook the cancelled pointerdown leaves focus on the host page", async () => {
+		const channel = "test_focus_control";
+		const iframe = await mountFrame(frameDocument(channel));
+		expect(await clickFrameThenPressKey(iframe, channel)).toBeUndefined();
+		expect(document.activeElement).not.toBe(iframe);
 	});
 });

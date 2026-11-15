@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, onMount } from "svelte";
+	import { onDestroy } from "svelte";
 	import DOMPurify from "isomorphic-dompurify";
 
 	import type { ArtifactRegistry, ArtifactVersion } from "$lib/utils/artifacts";
@@ -18,8 +18,9 @@
 	import { captureArtifactScreenshot, pngDataUrlToFile } from "$lib/utils/artifactCapture";
 	import { parseExternalUrl } from "$lib/utils/externalLink";
 	import { escapeHTML } from "$lib/utils/markedLight";
-	import { artifactPanel, ARTIFACT_PANEL_DEFAULT_FRACTION } from "$lib/stores/artifactPanel.svelte";
+	import { sidePane } from "$lib/stores/sidePane.svelte";
 	import { StickToBottomController } from "$lib/utils/scroll/stickToBottom";
+	import { useIsDesktop } from "$lib/utils/isDesktop.svelte";
 	import { pendingComposerPayload } from "$lib/stores/pendingComposerPayload";
 	import { formatScreenshotNotes } from "$lib/utils/screenshotNotes";
 	import { error as errorStore } from "$lib/stores/errors";
@@ -33,7 +34,6 @@
 	import DeployToSpaceModal from "./DeployToSpaceModal.svelte";
 	import ScreenshotAnnotationModal from "./ScreenshotAnnotationModal.svelte";
 
-	import CarbonCloseLarge from "~icons/carbon/close-large";
 	import CarbonChevronLeft from "~icons/carbon/chevron-left";
 	import CarbonChevronRight from "~icons/carbon/chevron-right";
 	import CarbonCamera from "~icons/carbon/camera";
@@ -47,6 +47,8 @@
 
 	interface Props {
 		registry: ArtifactRegistry;
+		/** set while the pane edge is dragged, so the preview does not swallow the pointer */
+		resizing?: boolean;
 		loading?: boolean;
 		/** Whether the current model accepts image attachments (enables screenshot-to-chat) */
 		canScreenshot?: boolean;
@@ -58,14 +60,20 @@
 		onsend?: (text: string) => boolean;
 	}
 
-	let { registry, loading = false, canScreenshot = false, onsend }: Props = $props();
+	let {
+		registry,
+		loading = false,
+		canScreenshot = false,
+		onsend,
+		resizing = false,
+	}: Props = $props();
 
 	let artifact = $derived(
-		artifactPanel.identifier ? registry.artifacts.get(artifactPanel.identifier) : undefined
+		sidePane.identifier ? registry.artifacts.get(sidePane.identifier) : undefined
 	);
 	let totalVersions = $derived(artifact?.versions.length ?? 0);
 	let displayVersionNumber = $derived(
-		artifactPanel.version === null ? totalVersions : Math.min(artifactPanel.version, totalVersions)
+		sidePane.version === null ? totalVersions : Math.min(sidePane.version, totalVersions)
 	);
 	let version = $derived<ArtifactVersion | undefined>(
 		artifact && displayVersionNumber > 0 ? artifact.versions[displayVersionNumber - 1] : undefined
@@ -73,7 +81,7 @@
 	let isStreamingVersion = $derived(!!version && !version.complete);
 	let previewable = $derived(!!version && isPreviewableKind(version.type));
 	let effectiveTab = $derived<"preview" | "code">(
-		!previewable || isStreamingVersion ? "code" : artifactPanel.tab
+		!previewable || isStreamingVersion ? "code" : sidePane.tab
 	);
 
 	// ----- diff view for edit versions -----
@@ -84,7 +92,7 @@
 		artifact && version && version.version > 1 ? artifact.versions[version.version - 2] : undefined
 	);
 	let canDiff = $derived(!!version?.complete && version?.op === "update" && !!prevVersion);
-	let showingDiff = $derived(canDiff && artifactPanel.diffView);
+	let showingDiff = $derived(canDiff && sidePane.diffView);
 	let diff = $derived(
 		showingDiff && version && prevVersion
 			? diffLines(prevVersion.content, version.content)
@@ -95,22 +103,20 @@
 	// Close the panel if its artifact disappeared (e.g. branch switch, message
 	// edit). Debounced: the registry can have transient gaps while a finished
 	// generation is invalidated/refetched, and those must not close the panel.
+	// Scoped to the artifact view: `identifier` outlives a switch to another view,
+	// so without the check a vanishing artifact would close someone else's pane.
 	$effect(() => {
-		if (artifactPanel.open && artifactPanel.identifier && !artifact) {
-			const timer = setTimeout(() => artifactPanel.close(), 300);
+		const tabId = sidePane.active?.kind === "artifact" ? sidePane.active.id : undefined;
+		if (tabId && !artifact) {
+			const timer = setTimeout(() => sidePane.closeTab(tabId), 300);
 			return () => clearTimeout(timer);
 		}
 	});
 
 	// ----- responsive container -----
-	let isDesktop = $state(true);
-	onMount(() => {
-		const mq = window.matchMedia("(min-width: 768px)");
-		isDesktop = mq.matches;
-		const onChange = () => (isDesktop = mq.matches);
-		mq.addEventListener("change", onChange);
-		return () => mq.removeEventListener("change", onChange);
-	});
+	// The frame itself is SidePane's; this is for the handlers below, which close
+	// the pane on mobile where it would otherwise cover what they just sent.
+	const isDesktop = useIsDesktop();
 
 	// ----- code view: throttled highlighting while streaming -----
 	let highlightedCode = $state("");
@@ -141,7 +147,7 @@
 	// the effect below re-runs automatically once the real highlighter lands.
 	let highlightCode: ((text: string, lang?: string) => string) | undefined = $state();
 	$effect(() => {
-		if (!artifactPanel.open || highlightCode) return;
+		if (!sidePane.open || highlightCode) return;
 		import("$lib/utils/marked")
 			.then((markedModule) => {
 				highlightCode = markedModule.highlightCode;
@@ -154,7 +160,7 @@
 	});
 
 	$effect(() => {
-		if (!artifactPanel.open) return;
+		if (!sidePane.open) return;
 		const highlight = highlightCode ?? ((text: string) => escapeHTML(text));
 		// A pending throttled run would paint stale content over whatever the
 		// branches below decide to show
@@ -202,12 +208,12 @@
 	// diffs land on their first change, everything else starts at the top.
 
 	// While streaming, the code view stays pinned to the bottom through a
-	// StickToBottomController in instant mode (code arrives in chunky highlight
-	// repaints, where a glide adds motion without information). The controller
-	// owns detach/re-attach, so a user scrolling up to read earlier output is
-	// never fought mid-gesture, re-attaching catches up immediately, and
-	// content reflows (word-wrap toggle, panel resize) re-pin only while
-	// actually following.
+	// StickToBottomController (growth follows are snaps — code arrives in
+	// chunky highlight repaints, where a glide adds motion without
+	// information). The controller owns detach/re-attach, so a user scrolling
+	// up to read earlier output is never fought mid-gesture, re-attaching
+	// catches up immediately, and content reflows (word-wrap toggle, panel
+	// resize) re-pin only while actually following.
 	let codeStick: StickToBottomController | null = null;
 	$effect(() => {
 		const el = codeScrollEl;
@@ -216,7 +222,6 @@
 			// The <code> child (kept block-level in the template so the size
 			// observer actually fires) is what grows with streamed content —
 			// the <pre> itself is h-full and never resizes.
-			followMode: "instant",
 			content: () => (el.firstElementChild as HTMLElement | null) ?? undefined,
 		});
 		// The anchor effect below decides each view's initial position; nothing
@@ -252,7 +257,7 @@
 		void highlightedCode;
 		const el = codeScrollEl;
 		if (!el || effectiveTab !== "code" || !version) return;
-		const key = `${artifactPanel.identifier}:${version.version}:${showingDiff ? "diff" : "full"}:${artifactPanel.revealNonce}`;
+		const key = `${sidePane.identifier}:${version.version}:${showingDiff ? "diff" : "full"}:${sidePane.revealNonce}`;
 		if (codeAnchor && codeAnchor.key === key && codeAnchor.el === el) return;
 		codeAnchor = { key, el };
 		const streaming = isStreamingVersion;
@@ -279,7 +284,7 @@
 	$effect(() => {
 		const el = previewScrollEl;
 		if (!el || !version) return;
-		const key = `${artifactPanel.identifier}:${version.version}:${artifactPanel.revealNonce}`;
+		const key = `${sidePane.identifier}:${version.version}:${sidePane.revealNonce}`;
 		if (previewAnchor && previewAnchor.key === key && previewAnchor.el === el) return;
 		previewAnchor = { key, el };
 		el.scrollTop = 0;
@@ -348,7 +353,7 @@
 	// visible next to the panel, which stays open to receive the fix.
 	function sendFixRequest(text: string): boolean {
 		const sent = onsend?.(text) ?? false;
-		if (sent && !isDesktop) artifactPanel.close();
+		if (sent && !isDesktop.current) sidePane.close();
 		return sent;
 	}
 
@@ -414,11 +419,19 @@
 		});
 		pendingScreenshot = null;
 		// On mobile the panel overlays the chat; close it so the attachment is visible
-		if (!isDesktop) artifactPanel.close();
+		if (!isDesktop.current) sidePane.close();
 	}
 
 	// ----- actions -----
 	let fullscreenOpen = $state(false);
+
+	// Fullscreen and a running generation hold Escape, so it does not also close the pane.
+	$effect(() => {
+		// only while an artifact is the tab showing: this view stays instantiated behind others
+		const showing = sidePane.open && sidePane.view === "artifact" && !!artifact;
+		sidePane.holdEscape("artifact", fullscreenOpen || (showing && loading));
+		return () => sidePane.holdEscape("artifact", false);
+	});
 	// Gates refresh + fullscreen, which both act on the live iframe preview
 	let livePreviewSupported = $derived(
 		!!version && version.complete && version.type !== "markdown" && version.type !== "code"
@@ -453,7 +466,7 @@
 	function gotoVersion(n: number) {
 		if (!artifact) return;
 		const clamped = Math.max(1, Math.min(n, totalVersions));
-		artifactPanel.version = clamped >= totalVersions ? null : clamped;
+		sidePane.version = clamped >= totalVersions ? null : clamped;
 	}
 
 	// ----- deploy to a Hugging Face Space (HuggingChat only) -----
@@ -489,41 +502,13 @@
 		sessionDeployments[cid] = { ...(sessionDeployments[cid] ?? {}), [id]: deployment };
 	}
 	let canDeploy = $derived(
-		publicConfig.isHuggingChat &&
+		!page.data.slackThreadUrl &&
+			publicConfig.isHuggingChat &&
 			!!conversationId &&
 			!!version &&
 			version.complete &&
 			isDeployableKind(version.type)
 	);
-
-	function handleKeydown(e: KeyboardEvent) {
-		// An Escape already consumed by a modal (external-link confirm, fullscreen
-		// preview) must not also close the panel
-		if (e.defaultPrevented) return;
-		if (e.key === "Escape" && artifactPanel.open && !fullscreenOpen && !loading) {
-			e.preventDefault();
-			artifactPanel.close();
-		}
-	}
-
-	// ----- resize (desktop) -----
-	let resizing = $state(false);
-	let asideEl: HTMLElement | undefined = $state();
-	function onResizeStart(e: PointerEvent) {
-		resizing = true;
-		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-	}
-	function onResizeMove(e: PointerEvent) {
-		if (!resizing) return;
-		// Clamp against the live chat/panel split (each pane keeps >= 20%) so the
-		// drag tracks the pointer 1:1 with no dead zone at the bounds.
-		const total = asideEl?.parentElement?.clientWidth ?? window.innerWidth;
-		const raw = window.innerWidth - e.clientX;
-		artifactPanel.setWidth(Math.min(Math.max(raw, Math.max(total * 0.2, 300)), total * 0.8));
-	}
-	function onResizeEnd() {
-		resizing = false;
-	}
 
 	const tabBase =
 		"rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40";
@@ -534,9 +519,9 @@
 		"btn rounded-md border border-gray-200/80 bg-white/90 p-1.5 text-xs backdrop-blur-xs hover:bg-gray-100 hover:text-gray-600 dark:border-gray-700/80 dark:bg-gray-900/90 dark:hover:bg-gray-800 dark:hover:text-gray-300";
 </script>
 
-<svelte:window onmessage={onWindowMessage} onkeydown={handleKeydown} />
+<svelte:window onmessage={onWindowMessage} />
 
-{#snippet panelContent()}
+{#snippet panelContent(resizing: boolean)}
 	<!-- header (z-10 so button tooltips aren't painted over by the body) -->
 	<header
 		class="@container relative z-10 flex h-12 flex-none items-center gap-2 border-b border-gray-100 px-3 dark:border-gray-800"
@@ -546,7 +531,7 @@
 				<EosIconsLoading class="flex-none text-sm text-gray-400" />
 			{/if}
 			<h2 class="truncate text-sm font-semibold text-gray-800 dark:text-gray-200">
-				{version?.title ?? artifactPanel.identifier}
+				{version?.title ?? sidePane.identifier}
 			</h2>
 			{#if totalVersions > 1}
 				<span
@@ -562,14 +547,14 @@
 				type="button"
 				class="{tabBase} {effectiveTab === 'preview' ? tabActive : tabInactive}"
 				disabled={!previewable || isStreamingVersion}
-				onclick={() => artifactPanel.selectTab("preview")}
+				onclick={() => sidePane.selectTab("preview")}
 			>
 				Preview
 			</button>
 			<button
 				type="button"
 				class="{tabBase} {effectiveTab === 'code' ? tabActive : tabInactive}"
-				onclick={() => artifactPanel.selectTab("code")}
+				onclick={() => sidePane.selectTab("code")}
 			>
 				Code
 			</button>
@@ -634,17 +619,6 @@
 					</button>
 				{/if}
 			{/if}
-			<!-- close-large at text-base: the X glyph fills less of its viewBox than the
-			     sibling icons, so it needs the bump to read as the same visual size;
-			     p-1 keeps the button footprint identical to its p-1.5 text-xs siblings -->
-			<button
-				type="button"
-				class="ml-0.5 btn rounded-md p-1 text-base hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-				title="Close panel (Esc)"
-				onclick={() => artifactPanel.close()}
-			>
-				<CarbonCloseLarge />
-			</button>
 		</div>
 	</header>
 
@@ -695,7 +669,7 @@
 				     the streaming follow silently dies after the first pin. -->
 				<pre
 					bind:this={codeScrollEl}
-					class="scrollbar-custom h-full overflow-auto border-0! px-5 py-4 font-mono {artifactPanel.codeWrap
+					class="scrollbar-custom h-full overflow-auto border-0! px-5 py-4 font-mono {sidePane.codeWrap
 						? 'wrap-break-word whitespace-pre-wrap'
 						: ''} {showingDiff ? 'diff-view' : ''}"><code class="block"
 						>{@html highlightedCode}</code
@@ -706,24 +680,24 @@
 				{#if canDiff}
 					<button
 						type="button"
-						class="{codeFloatBtn} {artifactPanel.diffView
+						class="{codeFloatBtn} {sidePane.diffView
 							? 'text-gray-600 dark:text-gray-300'
 							: 'text-gray-400'}"
-						title={artifactPanel.diffView ? "Show full code" : "Show what changed"}
-						aria-pressed={artifactPanel.diffView}
-						onclick={() => artifactPanel.toggleDiffView()}
+						title={sidePane.diffView ? "Show full code" : "Show what changed"}
+						aria-pressed={sidePane.diffView}
+						onclick={() => sidePane.toggleDiffView()}
 					>
 						<LucideDiff />
 					</button>
 				{/if}
 				<button
 					type="button"
-					class="{codeFloatBtn} {artifactPanel.codeWrap
+					class="{codeFloatBtn} {sidePane.codeWrap
 						? 'text-gray-600 dark:text-gray-300'
 						: 'text-gray-400'}"
-					title="{artifactPanel.codeWrap ? 'Disable' : 'Enable'} word wrap"
-					aria-pressed={artifactPanel.codeWrap}
-					onclick={() => artifactPanel.toggleCodeWrap()}
+					title="{sidePane.codeWrap ? 'Disable' : 'Enable'} word wrap"
+					aria-pressed={sidePane.codeWrap}
+					onclick={() => sidePane.toggleCodeWrap()}
 				>
 					<LucideWrapText />
 				</button>
@@ -825,40 +799,10 @@
 	</footer>
 {/snippet}
 
-{#if artifactPanel.open && artifact}
-	{#if isDesktop}
-		<aside
-			bind:this={asideEl}
-			class="pointer-events-auto relative z-10 flex h-full flex-none flex-col overflow-hidden border-l border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
-			style="width: {artifactPanel.widthPx !== null
-				? `${artifactPanel.widthPx}px`
-				: ARTIFACT_PANEL_DEFAULT_FRACTION}; min-width: max(20%, 300px); max-width: 80%;"
-			aria-label="Artifact panel"
-		>
-			<!-- resize handle (drag to resize, double-click to reset) -->
-			<div
-				role="separator"
-				aria-orientation="vertical"
-				class="absolute inset-y-0 left-0 z-20 w-1.5 cursor-col-resize transition-colors hover:bg-blue-400/40 {resizing
-					? 'bg-blue-400/60'
-					: ''}"
-				onpointerdown={onResizeStart}
-				onpointermove={onResizeMove}
-				onpointerup={onResizeEnd}
-				onpointercancel={onResizeEnd}
-				ondblclick={() => artifactPanel.resetWidth()}
-			></div>
-			{@render panelContent()}
-		</aside>
-	{:else}
-		<div
-			class="pointer-events-auto fixed inset-0 z-30 flex flex-col bg-white dark:bg-gray-900"
-			role="dialog"
-			aria-label="Artifact panel"
-		>
-			{@render panelContent()}
-		</div>
-	{/if}
+{#if sidePane.open && sidePane.view === "artifact" && artifact}
+	<div class="flex h-full min-h-0 flex-col" aria-label="Artifact panel">
+		{@render panelContent(resizing)}
+	</div>
 {/if}
 
 {#if fullscreenOpen && version}

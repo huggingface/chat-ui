@@ -26,3 +26,4 @@ models/*
 /playwright-report
 /blob-report
 /playwright/.cache
+.probe-results/

@@ -2,7 +2,12 @@ import { describe, expect, test } from "vitest";
 
 import type { Message } from "$lib/types/Message";
 import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
-import { isAssistantGenerationTerminal, isConversationGenerationActive } from "./generationState";
+import {
+	isAssistantGenerationTerminal,
+	isConversationGenerationActive,
+	isTurnSubscribable,
+	turnStateOf,
+} from "./generationState";
 
 function assistantMessage(overrides: Partial<Message> = {}): Message {
 	return {
@@ -133,5 +138,119 @@ describe("generationState", () => {
 	test("interrupted wins even without any terminal update present", () => {
 		const message = assistantMessage({ interrupted: true, updates: undefined });
 		expect(isAssistantGenerationTerminal(message)).toBe(true);
+	});
+
+	// A parked-and-resumed turn (the wait tool) has a lifecycle: every park
+	// stamps `finished`, every resume stamps a new `started`. The LAST lifecycle
+	// event decides — "ever finished" would freeze the message at its first park.
+
+	test("a resume after a park makes the message active again", () => {
+		const message = assistantMessage({
+			updates: [
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started },
+				{ type: MessageUpdateType.Stream, token: "resumed output" },
+			],
+		});
+		expect(isAssistantGenerationTerminal(message)).toBe(false);
+		expect(isConversationGenerationActive([message])).toBe(true);
+	});
+
+	test("a turn parked again after a resume reads terminal until the next start", () => {
+		const message = assistantMessage({
+			updates: [
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished },
+			],
+		});
+		expect(isAssistantGenerationTerminal(message)).toBe(true);
+	});
+
+	test("a final answer after the last start is terminal", () => {
+		const message = assistantMessage({
+			updates: [
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished },
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started },
+				{ type: MessageUpdateType.FinalAnswer, text: "done", interrupted: false },
+			],
+		});
+		expect(isAssistantGenerationTerminal(message)).toBe(true);
+	});
+});
+
+describe("turn state as the authoritative liveness", () => {
+	const state = (
+		st: "running" | "waiting" | "awaiting_input" | "done" | "failed",
+		extras: { until?: number; reason?: string } = {}
+	) => ({
+		type: MessageUpdateType.TurnState as const,
+		state: st,
+		serverNow: Date.now(),
+		...extras,
+	});
+
+	test("turnStateOf returns the LAST turn state the message carries", () => {
+		const message = assistantMessage({
+			updates: [
+				state("running"),
+				state("waiting", { until: Date.now() + 60_000 }),
+				state("running"),
+			],
+		});
+		expect(turnStateOf(message)?.state).toBe("running");
+		expect(turnStateOf(assistantMessage({ updates: [] }))).toBeUndefined();
+	});
+
+	test("only a running turn is non-terminal for UI purposes", () => {
+		expect(isAssistantGenerationTerminal(assistantMessage({ updates: [state("running")] }))).toBe(
+			false
+		);
+		for (const st of ["waiting", "awaiting_input", "done", "failed"] as const) {
+			expect(isAssistantGenerationTerminal(assistantMessage({ updates: [state(st)] }))).toBe(true);
+		}
+	});
+
+	test("the state wins over legacy lifecycle statuses when both are present", () => {
+		// A parked run stamps `finished` after the waiting transition; the state,
+		// not the status, is the truth.
+		const message = assistantMessage({
+			updates: [
+				state("waiting", { until: Date.now() + 60_000, reason: "job" }),
+				{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished },
+			],
+		});
+		expect(turnStateOf(message)?.state).toBe("waiting");
+		expect(isAssistantGenerationTerminal(message)).toBe(true);
+		expect(isTurnSubscribable(message)).toBe(true);
+	});
+
+	test("running, waiting and awaiting_input turns are subscribable; ended ones are not", () => {
+		for (const st of ["running", "waiting", "awaiting_input"] as const) {
+			expect(isTurnSubscribable(assistantMessage({ updates: [state(st)] }))).toBe(true);
+		}
+		for (const st of ["done", "failed"] as const) {
+			expect(isTurnSubscribable(assistantMessage({ updates: [state(st)] }))).toBe(false);
+		}
+	});
+
+	test("an interrupted message is neither active nor subscribable, whatever its state", () => {
+		const message = assistantMessage({ interrupted: true, updates: [state("running")] });
+		expect(isAssistantGenerationTerminal(message)).toBe(true);
+		expect(isTurnSubscribable(message)).toBe(false);
+	});
+
+	test("messages without a turn state fall back to the legacy lifecycle", () => {
+		const legacyLive = assistantMessage({
+			updates: [{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Started }],
+		});
+		expect(isTurnSubscribable(legacyLive)).toBe(true);
+		const legacyDone = assistantMessage({
+			updates: [{ type: MessageUpdateType.Status, status: MessageUpdateStatus.Finished }],
+		});
+		expect(isTurnSubscribable(legacyDone)).toBe(false);
 	});
 });

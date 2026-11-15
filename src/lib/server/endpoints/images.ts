@@ -3,6 +3,8 @@ import sharp from "sharp";
 import type { MessageFile } from "$lib/types/Message";
 import { z, type util } from "zod";
 
+sharp.block({ operation: ["VipsForeignLoadSvg"] });
+
 export interface ImageProcessorOptions<TMimeType extends string = string> {
 	supportedMimeTypes: TMimeType[];
 	preferredMimeType: TMimeType;

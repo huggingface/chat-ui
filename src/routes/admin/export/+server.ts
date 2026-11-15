@@ -1,6 +1,7 @@
 import { config } from "$lib/server/config";
 import { collections } from "$lib/server/database";
 import type { Message } from "$lib/types/Message";
+import { rebuildLegacyContent } from "$lib/utils/messageShape";
 import { error } from "@sveltejs/kit";
 import { pathToFileURL } from "node:url";
 import { unlink } from "node:fs/promises";
@@ -82,7 +83,7 @@ export async function POST({ request }) {
 			updated_at: conversation.updated_at,
 			messages: conversation.messages.map((message: Message) => ({
 				from: message.from,
-				content: message.content,
+				content: rebuildLegacyContent(message).content,
 				...(message.score ? { score: message.score } : undefined),
 			})),
 		});
@@ -127,7 +128,7 @@ export async function POST({ request }) {
 			updated_at: conversation.updated_at,
 			messages: conversation.messages.map((message: Message) => ({
 				from: message.from,
-				content: message.content,
+				content: rebuildLegacyContent(message).content,
 				...(message.score ? { score: message.score } : undefined),
 			})),
 		});

@@ -4,7 +4,6 @@ import { requireAuth } from "$lib/server/api/utils/requireAuth";
 import { resolveConversation } from "$lib/server/api/utils/resolveConversation";
 import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
-import { ObjectId } from "mongodb";
 
 export const DELETE: RequestHandler = async ({ locals, params }) => {
 	requireAuth(locals);
@@ -13,6 +12,7 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 	const messageId = params.messageId ?? "";
 
 	const conversation = await resolveConversation(id, locals);
+	if (conversation.kind === "share") error(404, "Conversation not found");
 
 	if (!conversation.messages.map((m) => m.id).includes(messageId)) {
 		error(404, "Message not found");
@@ -31,7 +31,7 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 		});
 
 	const res = await collections.conversations.updateOne(
-		{ _id: new ObjectId(conversation._id), ...authCondition(locals) },
+		{ _id: conversation.objectId, ...authCondition(locals) },
 		{ $set: { messages: filteredMessages } }
 	);
 

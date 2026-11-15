@@ -1,3 +1,5 @@
+import type { ToolArgsRewrite } from "./toolInvocation";
+
 /**
  * Decode the `arguments` string of a streamed tool call.
  *
@@ -39,4 +41,43 @@ export function hasTruncatedToolCall(
 		if (!call.name || parseToolArguments(call.arguments) === null) return true;
 	}
 	return false;
+}
+
+/**
+ * The same calls, with any `arguments` that will not parse replaced by an empty
+ * object.
+ *
+ * A model can emit an unparseable payload without the stream being cut — GLM
+ * sent a bare `{` on a round that finished with `tool_calls`, so
+ * `hasTruncatedToolCall` (which keys on `finish_reason === "length"`) had no
+ * reason to fire. That call fails, correctly, with a tool error the model can
+ * recover from. What it must not do is stay in the request: providers validate
+ * the tool calls in the history too, so echoing it back 400s every subsequent
+ * request of the turn — `400 Invalid JSON in tool call arguments: '{'` — and no
+ * retry can help, because the poison is the message being resent.
+ *
+ * Substituted rather than dropped: removing the call would orphan the tool
+ * result that answers it, which strict providers reject in its own right. The
+ * cross-turn replay in `prepareFiles.ts` already does exactly this at its own
+ * read boundary; this is the same guard on the write side of one turn.
+ */
+export function withParseableArguments<T extends { function?: { arguments?: string } }>(
+	calls: T[]
+): T[] {
+	return calls.map((call) => {
+		const raw = call.function?.arguments;
+		if (raw !== undefined && parseToolArguments(raw) === null) {
+			return { ...call, function: { ...call.function, arguments: "{}" } };
+		}
+		return call;
+	});
+}
+
+/** each rewrite reads the previous result, the same object back when none changed it */
+export function composeRewrites(
+	rewrites: (ToolArgsRewrite | undefined)[]
+): ToolArgsRewrite | undefined {
+	const present = rewrites.filter((rewrite): rewrite is ToolArgsRewrite => rewrite !== undefined);
+	if (present.length === 0) return undefined;
+	return (call) => present.reduce((args, rewrite) => rewrite({ ...call, args }), call.args);
 }

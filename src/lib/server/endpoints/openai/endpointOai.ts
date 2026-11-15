@@ -15,7 +15,14 @@ import type { Endpoint } from "../endpoints";
 import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import { prepareMessagesWithFiles } from "$lib/server/textGeneration/utils/prepareFiles";
+import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWindowFlag";
+import { windowLimitChars } from "$lib/server/textGeneration/utils/historyWindow";
+import { prepareAttachments } from "$lib/server/textGeneration/utils/attachmentBudget";
+import { fetchWithProviderFallback } from "./providerFallback";
+import { inferenceBillingHeaders } from "$lib/server/billing";
 // uuid import removed (no tool call ids)
+
+const DEFAULT_PIN_HEADER = "X-ChatUI-Default-Provider";
 
 export const endpointOAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -78,7 +85,14 @@ export async function endpointOai(
 
 	// Custom fetch wrapper to capture response headers for router metadata
 	const customFetch = async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
-		const response = await fetch(url, init);
+		// the client is shared across calls, so whether this one's provider is a default rides on a
+		// header of our own, taken off before the request leaves
+		const headers = new Headers(init?.headers);
+		const defaultPin = headers.get(DEFAULT_PIN_HEADER) === "1";
+		headers.delete(DEFAULT_PIN_HEADER);
+		const response = await fetchWithProviderFallback(url, { ...init, headers }, model, {
+			defaultPin,
+		});
 
 		// Capture router headers if present (fallback for non-streaming)
 		const routeHeader = response.headers.get("X-Router-Route");
@@ -123,9 +137,24 @@ export async function endpointOai(
 			locals,
 			abortSignal,
 			provider,
+			providerIsDefault,
+			attachments,
+			onAttachments,
 		}) => {
+			const parameters = { ...model.parameters, ...generateSettings };
+			// the prompt renders message content only, pasted text and files have to be in it
+			const { contentOf, report } = await prepareAttachments(messages, imageProcessor, false, {
+				limitChars: model.contextLength
+					? windowLimitChars(model.contextLength, parameters?.max_tokens)
+					: undefined,
+				mode: attachments,
+			});
+			onAttachments?.(report);
 			const prompt = await buildPrompt({
-				messages,
+				messages: messages.map((message, index) => {
+					const content = message.from === "user" ? contentOf(index) : message.content;
+					return typeof content === "string" ? { ...message, content } : message;
+				}),
 				preprompt,
 				model,
 			});
@@ -134,7 +163,6 @@ export async function endpointOai(
 			const baseModelId = model.id ?? model.name;
 			const modelId = provider && provider !== "auto" ? `${baseModelId}:${provider}` : baseModelId;
 
-			const parameters = { ...model.parameters, ...generateSettings };
 			const body: CompletionCreateParamsStreaming = {
 				model: modelId,
 				prompt,
@@ -150,13 +178,14 @@ export async function endpointOai(
 			const openAICompletion = await openai.completions.create(body, {
 				body: { ...body, ...extraBody },
 				headers: {
+					...(providerIsDefault ? { [DEFAULT_PIN_HEADER]: "1" } : {}),
 					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 					"X-use-cache": "false",
 					...(config.USE_USER_TOKEN === "true" && locals?.token
 						? { Authorization: `Bearer ${locals.token}` }
 						: {}),
 					// Bill to organization if configured
-					...(locals?.billingOrganization ? { "X-HF-Bill-To": locals.billingOrganization } : {}),
+					...inferenceBillingHeaders(locals),
 				},
 				signal: abortSignal,
 			});
@@ -173,8 +202,12 @@ export async function endpointOai(
 			locals,
 			abortSignal,
 			provider,
+			providerIsDefault,
 			reasoningEffort,
 			reasoningOverride,
+			historyWindow,
+			attachments,
+			onAttachments,
 		}) => {
 			// Hoisted above the message prep so the history budget can reserve the
 			// reply allowance this request will actually ask for.
@@ -200,6 +233,10 @@ export async function endpointOai(
 					currentProducerModel: model.id ?? model.name,
 					contextLengthTokens: model.contextLength,
 					maxOutputTokens: parameters?.max_tokens,
+					slidingWindow: historyWindowEnabled(),
+					window: conversationId ? { conversationId, stored: historyWindow } : undefined,
+					attachments,
+					onAttachments,
 				});
 
 			// Normalize preprompt and handle empty values
@@ -252,15 +289,14 @@ export async function endpointOai(
 					{
 						body: { ...body, ...extraBody },
 						headers: {
+							...(providerIsDefault ? { [DEFAULT_PIN_HEADER]: "1" } : {}),
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
 							...(config.USE_USER_TOKEN === "true" && locals?.token
 								? { Authorization: `Bearer ${locals.token}` }
 								: {}),
 							// Bill to organization if configured
-							...(locals?.billingOrganization
-								? { "X-HF-Bill-To": locals.billingOrganization }
-								: {}),
+							...inferenceBillingHeaders(locals),
 						},
 						signal: abortSignal,
 					}
@@ -272,15 +308,14 @@ export async function endpointOai(
 					{
 						body: { ...body, ...extraBody },
 						headers: {
+							...(providerIsDefault ? { [DEFAULT_PIN_HEADER]: "1" } : {}),
 							"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
 							"X-use-cache": "false",
 							...(config.USE_USER_TOKEN === "true" && locals?.token
 								? { Authorization: `Bearer ${locals.token}` }
 								: {}),
 							// Bill to organization if configured
-							...(locals?.billingOrganization
-								? { "X-HF-Bill-To": locals.billingOrganization }
-								: {}),
+							...inferenceBillingHeaders(locals),
 						},
 						signal: abortSignal,
 					}

@@ -3,6 +3,7 @@ import { authCondition } from "$lib/server/auth";
 import { collections } from "$lib/server/database";
 import { models } from "$lib/server/models";
 import { buildSubtree } from "$lib/utils/tree/buildSubtree";
+import { toLegacyShape } from "$lib/utils/messageShape";
 import { isMessageId } from "$lib/utils/tree/isMessageId";
 import { error } from "@sveltejs/kit";
 import { ObjectId } from "mongodb";
@@ -36,7 +37,7 @@ export async function GET({ params, locals }) {
 		error(404, "Conversation model not found");
 	}
 
-	const messagesUpTo = buildSubtree(conv, messageId);
+	const messagesUpTo = buildSubtree(conv, messageId).map(toLegacyShape);
 
 	const prompt = await buildPrompt({
 		preprompt: conv.preprompt,

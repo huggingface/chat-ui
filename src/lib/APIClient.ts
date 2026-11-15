@@ -104,6 +104,26 @@ export function useAPIClient({
 				...endpoint(fetcher, `${baseUrl}/conversations/${params.id}`),
 				message: (msgParams: { messageId: string }) =>
 					endpoint(fetcher, `${baseUrl}/conversations/${params.id}/message/${msgParams.messageId}`),
+				registry: Object.assign(
+					endpoint(fetcher, `${baseUrl}/conversations/${params.id}/registry`),
+					{
+						stop: (serviceId: string) =>
+							endpoint(
+								fetcher,
+								`${baseUrl}/conversations/${params.id}/registry/${encodeURIComponent(serviceId)}/stop`
+							),
+					}
+				),
+				files: (name: string) =>
+					endpoint(
+						fetcher,
+						`${baseUrl}/conversations/${params.id}/files/${name.split("/").map(encodeURIComponent).join("/")}`
+					),
+				runs: (runId: string) =>
+					endpoint(
+						fetcher,
+						`${baseUrl}/conversations/${params.id}/runs/${encodeURIComponent(runId)}`
+					),
 			}),
 			// client.conversations.get(), .delete()
 			{

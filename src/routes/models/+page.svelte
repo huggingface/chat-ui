@@ -12,8 +12,11 @@
 	import IconFast from "$lib/components/icons/IconFast.svelte";
 	import IconCheap from "$lib/components/icons/IconCheap.svelte";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
+	import { shownProvider } from "$lib/utils/shownProvider";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { goto } from "$app/navigation";
+	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 	interface Props {
 		data: PageData;
 	}
@@ -29,9 +32,20 @@
 	const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ");
 	let queryTokens = $derived(normalize(modelFilter).trim().split(/\s+/).filter(Boolean));
 
+	// With the ML Intern switch on, only the mode's fixed set is offered, in its
+	// configured order — anything else would be swapped for the default on send.
+	let mlModelsOnly = $derived(ML_ASSISTANT_MODE && mlAssistant.enabled);
+	let browsableModels = $derived(
+		mlModelsOnly
+			? data.mlAssistantModels
+					.map((id) => data.models.find((el) => el.id === id))
+					.filter((el): el is (typeof data.models)[number] => el !== undefined)
+			: data.models
+	);
+
 	// Filtered models list
 	let filteredModels = $derived(
-		data.models
+		browsableModels
 			.filter((el) => !el.unlisted)
 			.filter((el) => {
 				const haystack = normalize(`${el.id} ${el.name ?? ""} ${el.displayName ?? ""}`);
@@ -79,12 +93,16 @@
 			{/if}
 		</div>
 		<h2 class="text-gray-500">
-			All models available{#if publicConfig.isHuggingChat}&nbsp;via <a
-					target="_blank"
-					href="https://huggingface.co/inference/models"
-					class="underline decoration-gray-300 hover:decoration-gray-500 dark:decoration-gray-600 dark:hover:decoration-gray-500"
-					>Inference Providers</a
-				>{/if}
+			{#if mlModelsOnly}
+				Models available in ML Intern mode. Turn the mode off in the composer to browse every model.
+			{:else}
+				All models available{#if publicConfig.isHuggingChat}&nbsp;via <a
+						target="_blank"
+						href="https://huggingface.co/inference/models"
+						class="underline decoration-gray-300 hover:decoration-gray-500 dark:decoration-gray-600 dark:hover:decoration-gray-500"
+						>Inference Providers</a
+					>{/if}
+			{/if}
 		</h2>
 
 		<!-- Filter input -->
@@ -134,7 +152,7 @@
 								>
 									{model.displayName}
 								</h3>
-								{#if index === 0 && model.isRouter && !isActive}
+								{#if ((index === 0 && model.isRouter) || (mlModelsOnly && model.id === data.mlAssistantModels[0])) && !isActive}
 									<span
 										class="rounded-sm border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 uppercase dark:border-gray-700 dark:text-gray-400"
 									>
@@ -151,8 +169,8 @@
 
 						<!-- Icons and badges -->
 						<div class="flex flex-shrink-0 items-center gap-1.5">
-							{#if publicConfig.isHuggingChat && !model.isRouter && $settings.providerOverrides?.[model.id] && $settings.providerOverrides[model.id] !== "auto"}
-								{@const providerOverride = $settings.providerOverrides[model.id]}
+							{#if publicConfig.isHuggingChat && shownProvider(model, $settings.providerOverrides)}
+								{@const providerOverride = shownProvider(model, $settings.providerOverrides) ?? ""}
 								{@const hubOrg =
 									PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
 								{#if providerOverride === "fastest"}
