@@ -90,20 +90,20 @@
 	const nModels: number = page.data.models.filter((el: Model) => !el.unlisted).length;
 
 	async function handleVisible() {
-		p++;
-		const newConvs = await client.conversations
+		p = convsStore.nextPage;
+		const res = await client.conversations
 			.get({
 				query: {
 					p,
 				},
 			})
 			.then(handleResponse)
-			.then((r) => r.conversations)
-			.catch((): ConvSidebar[] => []);
+			.catch(() => ({ conversations: [] as ConvSidebar[], hasMore: false }));
+		const newConvs = res.conversations;
 
-		if (newConvs.length === 0) {
-			hasMore = false;
-		}
+		// Re-requesting a partly loaded last page returns rows that are all known, so stop
+		// on the server's flag rather than on an empty page.
+		hasMore = res.hasMore;
 
 		// Older pages go into the shared store, not a local copy of the prop: a local
 		// copy is dropped as soon as the store list is replaced (delete, new chat) and
