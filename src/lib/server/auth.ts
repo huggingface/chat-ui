@@ -411,6 +411,11 @@ export async function validateAndParseCsrfToken(
 type CookieRecord = Cookies;
 type HeaderRecord = Headers;
 
+const bearerWhoami = z.object({
+	id: z.string().min(1),
+	auth: z.object({ type: z.string() }),
+});
+
 export async function getCoupledCookieHash(cookie: CookieRecord): Promise<string | undefined> {
 	if (!config.COUPLE_SESSION_WITH_COOKIE_NAME) {
 		return undefined;
@@ -513,7 +518,13 @@ export async function authenticateRequest(
 				throw new Error("Unauthorized");
 			}
 
-			const data = await response.json();
+			const whoami = bearerWhoami.safeParse(await response.json());
+			// oauth and app tokens are limited to the scopes a user granted, only personal tokens open a session
+			if (!whoami.success || whoami.data.auth.type !== "access_token") {
+				throw new Error("Unauthorized");
+			}
+
+			const data = whoami.data;
 			const user = await collections.users.findOne({ hfUserId: data.id });
 			if (!user) {
 				throw new Error("User not found");

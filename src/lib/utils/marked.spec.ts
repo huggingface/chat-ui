@@ -28,9 +28,31 @@ describe("marked basic rendering", () => {
 		expect(html).toContain("link</a>");
 	});
 
+	test("renders a paper citation as a page tag, page 1 when none is given", () => {
+		const cited = renderHtml('[p. 5](paper:1706.03762v7#p5 "exact words")');
+		expect(cited).toContain('data-paper-cite="1706.03762" data-page="5"');
+		expect(cited).toContain('data-quote="exact words"');
+		const bare = renderHtml("[1706.03762](paper:1706.03762)");
+		expect(bare).toContain('data-paper-cite="1706.03762" data-page="1"');
+		expect(bare).not.toContain('target="_blank"');
+	});
+
+	test("never hands an unreadable paper link on as a URL", () => {
+		const html = renderHtml("[x](paper:a:b)");
+		expect(html).not.toContain("<a");
+		expect(html).toContain("<span>x</span>");
+	});
+
 	test("renders paragraphs", () => {
 		const html = renderHtml("hello world");
 		expect(html).toContain("<p>hello world</p>");
+	});
+
+	test("wraps tables in a horizontal scroll container", () => {
+		const html = renderHtml("| a | b |\n|---|--:|\n| 1 | 2 |");
+		expect(html).toMatch(/^<div class="table-scroll"><table>[\s\S]*<\/table><\/div>\s*$/);
+		expect(html).toContain("<thead>");
+		expect(html).toContain('<tbody><tr>\n<td>1</td>\n<td align="right">2</td>');
 	});
 });
 
@@ -275,5 +297,34 @@ describe("fallbackBlocks (SSR / initial render)", () => {
 		const b = fallbackBlocks("hello world");
 		expect(a[0].id).toBe(b[0].id);
 		expect(a[0].tokens).toEqual(b[0].tokens);
+	});
+});
+
+describe("inline $ math", () => {
+	const html = (content: string) =>
+		processTokensSync(content, [])
+			.map((token) => (token.type === "text" && typeof token.html === "string" ? token.html : ""))
+			.join("");
+	const mathCount = (content: string) => (html(content).match(/class="katex"/g) ?? []).length;
+
+	test("leaves prices alone", () => {
+		expect(
+			mathCount(
+				"This session has $0.00 of compute budget, so I need a grant. A baseline eval is ~30–60 min on an A10G (~$1); the SFT experiment is 2–3 h (~$3)."
+			)
+		).toBe(0);
+		expect(mathCount("It costs $5 and $10 to run.")).toBe(0);
+		expect(mathCount("Somewhere between $5-$10 per run.")).toBe(0);
+	});
+
+	test("still renders real math, including next to punctuation and words", () => {
+		expect(mathCount("Let $x^2 + y^2 = r^2$.")).toBe(1);
+		expect(mathCount("$x$")).toBe(1);
+		expect(mathCount("the $n$th term and $\\alpha$-stable laws")).toBe(2);
+		expect(mathCount("It costs $5, and $x = 2$ here.")).toBe(1);
+	});
+
+	test("needs its content to hug the dollars", () => {
+		expect(mathCount("$ x $")).toBe(0);
 	});
 });

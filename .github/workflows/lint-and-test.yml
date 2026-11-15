@@ -6,17 +6,21 @@ on:
     branches:
       - main
 
+permissions: {}
+
 jobs:
   lint:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
 
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
         with:
-          node-version: "20"
+          node-version-file: .nvmrc
           cache: "npm"
       - run: npm  ci
       - name: "Checking lint/format errors"
@@ -26,14 +30,19 @@ jobs:
           npm run check
 
   test:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
+    # Browsers and their system deps are baked in; do not add `playwright install`.
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
+      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
         with:
-          node-version: "20"
+          node-version-file: .nvmrc
           cache: "npm"
 
       # The server workspace spawns a MongoMemoryServer per test file. On a cold runner
@@ -41,66 +50,96 @@ jobs:
       # kills whole suites at collection time with an "unlock file ... not locked by this
       # process" error. Caching the binary removes that failure mode.
       - name: Cache mongodb-memory-server binaries
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/mongodb-binaries
-          key: mongodb-binaries-${{ runner.os }}
+          key: mongodb-binaries-${{ runner.os }}-container
 
       - run: npm ci
 
-      - run: npx playwright install --with-deps chromium
+      - name: Check the image has the browsers this Playwright expects
+        run: |
+          missing=$(npx playwright install --dry-run chromium \
+            | sed -n 's/^[[:space:]]*Install location:[[:space:]]*//p' \
+            | while IFS= read -r dir; do [ -d "$dir" ] || echo "$dir"; done)
+          if [ -n "$missing" ]; then
+            echo "::error file=.github/workflows/lint-and-test.yml::The container image is missing browsers this Playwright build expects:"
+            echo "$missing"
+            echo "::error file=.github/workflows/lint-and-test.yml::Bump the mcr.microsoft.com/playwright image tag to match playwright-core in package-lock.json."
+            exit 1
+          fi
 
       - name: "Tests (node)"
         run: npm run test
+
+      - name: "Slack Space snapshot restore"
+        run: node --test integrations/slack/space/state.test.mjs
 
       - name: "Tests (browser)"
         run: npm run test:client
 
   e2e:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
     timeout-minutes: 20
+    # The suite runs on one worker (see playwright.config.ts), so the only way to
+    # parallelise it is across jobs: each shard boots its own app and database.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
+      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
         with:
-          # Newer than the other jobs on purpose: the e2e servers under tests/ are
-          # TypeScript run directly by node via --experimental-strip-types, which
-          # needs Node >= 22.6.
-          node-version: "22"
+          node-version-file: .nvmrc
           cache: "npm"
 
       # The harness starts its own MongoMemoryServer (see startTestDatabase in
       # tests/fixtures.ts). Same cache key as the unit-test job so they share the
       # downloaded mongod binary.
       - name: Cache mongodb-memory-server binaries
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/mongodb-binaries
-          key: mongodb-binaries-${{ runner.os }}
+          key: mongodb-binaries-${{ runner.os }}-container
 
       - run: npm ci
 
-      # WebKit is not optional — the worst regression cluster in this repo is
-      # Safari-specific scroll and layout behaviour.
-      - run: npx playwright install --with-deps chromium webkit
+      - name: Check the image has the browsers this Playwright expects
+        run: |
+          missing=$(npx playwright install --dry-run chromium webkit \
+            | sed -n 's/^[[:space:]]*Install location:[[:space:]]*//p' \
+            | while IFS= read -r dir; do [ -d "$dir" ] || echo "$dir"; done)
+          if [ -n "$missing" ]; then
+            echo "::error file=.github/workflows/lint-and-test.yml::The container image is missing browsers this Playwright build expects:"
+            echo "$missing"
+            echo "::error file=.github/workflows/lint-and-test.yml::Bump the mcr.microsoft.com/playwright image tag to match playwright-core in package-lock.json."
+            exit 1
+          fi
 
       - name: "Tests (e2e)"
-        run: npm run test:e2e
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
 
   build-check:
+    permissions:
+      contents: read
     runs-on:
       group: aws-general-8-plus
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
       - name: Build Docker image
         run: |
           docker build \

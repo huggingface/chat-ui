@@ -7,26 +7,6 @@ export interface AttachmentLoadResult {
 }
 
 /**
- * Parse attachment URLs from query parameters
- * Supports both comma-separated (?attachments=url1,url2) and multiple params (?attachments=url1&attachments=url2)
- */
-function parseAttachmentUrls(searchParams: URLSearchParams): string[] {
-	const urls: string[] = [];
-
-	// Get all 'attachments' parameters
-	const attachmentParams = searchParams.getAll("attachments");
-
-	for (const param of attachmentParams) {
-		// Split by comma in case multiple URLs are in one param
-		const splitUrls = param.split(",").map((url) => url.trim());
-		urls.push(...splitUrls);
-	}
-
-	// Filter out empty strings
-	return urls.filter((url) => url.length > 0);
-}
-
-/**
  * Extract filename from URL or Content-Disposition header
  */
 function extractFilename(url: string, contentDisposition?: string | null): string {
@@ -64,13 +44,12 @@ function extractFilename(url: string, contentDisposition?: string | null): strin
 }
 
 /**
- * Load files from remote URLs via server-side proxy
+ * Load files from remote URLs via the server-side proxy. The caller decides
+ * which URLs to load and when — see `readLinkPromptRequest` for how they are
+ * parsed off a deep link, and the routes for the confirmation that precedes
+ * this for untrusted sources.
  */
-export async function loadAttachmentsFromUrls(
-	searchParams: URLSearchParams
-): Promise<AttachmentLoadResult> {
-	const urls = parseAttachmentUrls(searchParams);
-
+export async function loadAttachmentsFromUrls(urls: string[]): Promise<AttachmentLoadResult> {
 	if (urls.length === 0) {
 		return { files: [], errors: [] };
 	}

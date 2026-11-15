@@ -1,8 +1,9 @@
 import { Address4, Address6 } from "ip-address";
-import { isIP } from "node:net";
+import { isIP, type LookupFunction } from "node:net";
 import dns from "node:dns";
 import { Agent, fetch as undiciFetch } from "undici";
 import { env } from "$env/dynamic/private";
+import { logger } from "$lib/server/logger";
 
 const UNSAFE_IPV4_SUBNETS = [
 	"0.0.0.0/8",
@@ -12,6 +13,20 @@ const UNSAFE_IPV4_SUBNETS = [
 	"172.16.0.0/12",
 	"192.168.0.0/16",
 ].map((s) => new Address4(s));
+
+// IPv4-mapped IPv6 range. Matched as a subnet rather than with ip-address's `is4()`, which
+// only recognises the dotted textual form: the URL parser rewrites `::ffff:127.0.0.1` to its
+// canonical hex form `::ffff:7f00:1`, for which `is4()` returns false.
+const IPV4_MAPPED_IPV6_SUBNET = new Address6("::ffff:0:0/96");
+
+// Unique local addresses (fc00::/7) are the IPv6 counterpart of the private IPv4 ranges;
+// `isLoopback()`/`isLinkLocal()` do not cover them.
+const UNIQUE_LOCAL_IPV6_SUBNET = new Address6("fc00::/7");
+
+/** IPv6 literals arrive from `URL.hostname` bracketed; `isIP` only accepts them bare. */
+function stripBrackets(hostname: string): string {
+	return hostname.replace(/^\[|]$/g, "");
+}
 
 function isUnsafeIp(address: string): boolean {
 	const family = isIP(address);
@@ -23,10 +38,18 @@ function isUnsafeIp(address: string): boolean {
 
 	if (family === 6) {
 		const addr = new Address6(address);
-		// Check IPv4-mapped IPv6 addresses (e.g. ::ffff:127.0.0.1)
-		if (addr.is4()) {
+		// IPv4-mapped addresses (e.g. ::ffff:127.0.0.1) connect to the embedded IPv4 host.
+		if (addr.isInSubnet(IPV4_MAPPED_IPV6_SUBNET)) {
 			const v4 = addr.to4();
 			return UNSAFE_IPV4_SUBNETS.some((subnet) => v4.isInSubnet(subnet));
+		}
+		// The unspecified address reaches localhost, exactly as 0.0.0.0 does.
+		if (addr.correctForm() === "::") {
+			return true;
+		}
+		// Unique local addresses (fc00::/7) are private, like 10.0.0.0/8 for IPv4.
+		if (addr.isInSubnet(UNIQUE_LOCAL_IPV6_SUBNET)) {
+			return true;
 		}
 		return addr.isLoopback() || addr.isLinkLocal();
 	}
@@ -102,7 +125,7 @@ export function isValidUrl(
 			return insecure;
 		}
 		// If the hostname is a raw IP literal, validate it
-		const cleanHostname = hostname.replace(/^\[|]$/g, "");
+		const cleanHostname = stripBrackets(hostname);
 		if (isIP(cleanHostname)) {
 			return insecure || !isUnsafeIp(cleanHostname);
 		}
@@ -113,54 +136,42 @@ export function isValidUrl(
 }
 
 /**
- * Assert that a resolved IP address is safe (not internal/private).
- * Throws if the IP is internal. Used in undici's custom DNS lookup
- * to validate IPs at connection time (prevents TOCTOU DNS rebinding).
+ * The SSRF agent's DNS hook: validates resolved IPs at connection time (preventing TOCTOU DNS
+ * rebinding) and logs every lookup, failed, blocked or allowed. With the request context the
+ * logger adds, that is what ties a DNS event seen by a runtime sensor to the request behind it.
  */
-export function assertSafeIp(address: string, hostname: string): void {
-	if (isUnsafeIp(address)) {
-		throw new Error(`Resolved IP for ${hostname} is internal (${address})`);
-	}
+export function ssrfLookup(exempt: (hostname: string) => boolean = () => false): LookupFunction {
+	return (hostname, options, callback) => {
+		dns.lookup(hostname, options, (err, address, family) => {
+			if (err) {
+				logger.info({ fetchHost: hostname, err }, "Outbound fetch lookup failed");
+				return callback(err, "", 4);
+			}
+			const addresses =
+				typeof address === "string" ? [address] : address.map((entry) => entry.address);
+			const fields = { fetchHost: hostname, fetchAddresses: addresses };
+			// Compared to undefined, not tested for truthiness: `isUnsafeIp("")` is true.
+			const unsafe = exempt(hostname.toLowerCase()) ? undefined : addresses.find(isUnsafeIp);
+			if (unsafe !== undefined) {
+				logger.warn(fields, "Outbound fetch blocked: host resolves to an internal address (SSRF)");
+				return callback(new Error(`Resolved IP for ${hostname} is internal (${unsafe})`), "", 4);
+			}
+			logger.info(fields, "Outbound fetch resolved");
+			return callback(null, address, family);
+		});
+	};
 }
 
-/**
- * Undici agent that validates resolved IPs at connection time,
- * preventing TOCTOU DNS rebinding attacks.
- */
-function createSsrfAgent(exempt: (hostname: string) => boolean = () => false): Agent {
-	return new Agent({
-		connect: {
-			lookup: (hostname, options, callback) => {
-				dns.lookup(hostname, options, (err, address, family) => {
-					if (err) return callback(err, "", 4);
-					if (exempt(hostname.toLowerCase())) return callback(null, address, family);
-					if (typeof address === "string") {
-						try {
-							assertSafeIp(address, hostname);
-						} catch (e) {
-							return callback(e as Error, "", 4);
-						}
-					} else if (Array.isArray(address)) {
-						for (const entry of address) {
-							try {
-								assertSafeIp(entry.address, hostname);
-							} catch (e) {
-								return callback(e as Error, "", 4);
-							}
-						}
-					}
-					return callback(null, address, family);
-				});
-			},
-		},
-	});
+function createSsrfAgent(exempt?: (hostname: string) => boolean): Agent {
+	return new Agent({ connect: { lookup: ssrfLookup(exempt) } });
 }
 
 const ssrfSafeAgent = createSsrfAgent();
 
 /**
- * Only `localhost` needs the exemption. IP literals never reach the hook at all — undici calls
- * `lookup` only for names requiring DNS — so loopback and private-LAN literals already connect.
+ * Only `localhost` needs the DNS-hook exemption — it is the sole local host that reaches this
+ * hook (undici resolves it through DNS). Local IP literals never reach the hook and are gated
+ * up front by `assertSafeUrlHost`, which applies the same insecure-local allowance instead.
  */
 let localMcpAgent: Agent | undefined;
 function getLocalMcpAgent(): Agent {
@@ -171,25 +182,54 @@ function getLocalMcpAgent(): Agent {
 const MAX_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
+// Native fetch drops these when a redirect changes origin. This manual loop must do the same, or an
+// MCP/OAuth endpoint could redirect the user's bearer token (or cookies) to an attacker-controlled host.
+const CROSS_ORIGIN_STRIPPED_HEADERS = ["authorization", "cookie", "proxy-authorization"];
+
+function stripCredentialHeaders(init: RequestInit | undefined): RequestInit | undefined {
+	if (!init?.headers) return init;
+	const headers = new Headers(init.headers as HeadersInit);
+	for (const name of CROSS_ORIGIN_STRIPPED_HEADERS) headers.delete(name);
+	return { ...init, headers };
+}
+
 /**
- * Fetch wrapper that validates resolved IPs at connection time
- * and validates redirect targets to prevent SSRF via open redirects.
+ * Assert that a URL's host is safe before we connect to it.
  *
- * If the caller sets `redirect: "manual"`, redirects are returned as-is
- * (the caller is responsible for validation). Otherwise, redirects are
- * followed internally with each hop validated by `isValidUrl`.
+ * The agent's `lookup` hook only runs for hosts undici resolves through DNS, so a URL carrying a
+ * raw IP literal would otherwise reach the network without the hook's check ever running. Checks
+ * `isUnsafeIp` rather than `isValidUrl` because the latter also demands HTTPS, which would break
+ * plain-HTTP MCP servers. When `allowLocal` is set (opt-in insecure MCP), local literals are
+ * exempted so `mcpFetch` can still reach a `127.0.0.1`/LAN server before the socket opens.
+ */
+function assertSafeUrlHost(urlString: string, allowLocal: boolean): void {
+	const host = stripBrackets(new URL(urlString).hostname.toLowerCase());
+	if (isIP(host) && isUnsafeIp(host) && !(allowLocal && isLocalMcpIp(host))) {
+		logger.warn({ fetchHost: host }, "Outbound fetch blocked: unsafe IP literal (SSRF)");
+		throw new Error(`Blocked request to unsafe IP (SSRF): ${host}`);
+	}
+}
+
+/**
+ * Fetch wrapper that rejects unsafe IP literals up front, validates resolved IPs at connection
+ * time, and validates redirect targets to prevent SSRF via open redirects.
+ *
+ * If the caller sets `redirect: "manual"`, redirects are returned as-is (the caller is
+ * responsible for validation). Otherwise, redirects are followed internally with each hop
+ * validated by `isValidUrl`.
  */
 async function guardedFetch(
 	url: string | URL,
 	init: RequestInit | undefined,
 	options: UrlSafetyOptions
 ): Promise<Response> {
-	const dispatcher =
-		options.allowInsecure && insecureMcpUrlsAllowed() ? getLocalMcpAgent() : ssrfSafeAgent;
+	const allowLocal = Boolean(options.allowInsecure) && insecureMcpUrlsAllowed();
+	const dispatcher = allowLocal ? getLocalMcpAgent() : ssrfSafeAgent;
 	const callerRedirect = init?.redirect ?? "follow";
 
 	if (callerRedirect === "error") {
 		// Honour redirect:"error" — make the request and throw if we get a redirect
+		assertSafeUrlHost(url.toString(), allowLocal);
 		const response = (await undiciFetch(url.toString(), {
 			...(init as Record<string, unknown>),
 			redirect: "manual",
@@ -203,6 +243,7 @@ async function guardedFetch(
 
 	if (callerRedirect === "manual") {
 		// Caller handles redirects — return as-is
+		assertSafeUrlHost(url.toString(), allowLocal);
 		return (await undiciFetch(url.toString(), {
 			...(init as Record<string, unknown>),
 			redirect: "manual",
@@ -214,9 +255,11 @@ async function guardedFetch(
 	let currentUrl = url.toString();
 	let currentInit = init;
 	let redirectCount = 0;
+	let credentialsDropped = false;
 
 	// eslint-disable-next-line no-constant-condition
 	while (true) {
+		assertSafeUrlHost(currentUrl, allowLocal);
 		const response = (await undiciFetch(currentUrl, {
 			...(currentInit as Record<string, unknown>),
 			redirect: "manual",
@@ -246,6 +289,15 @@ async function guardedFetch(
 				(response.status === 303 && method !== "GET" && method !== "HEAD")
 			) {
 				currentInit = { ...init, method: "GET", body: undefined };
+			}
+
+			// Once a hop crosses origin, strip credentials for this and every later hop (matching
+			// native fetch) so a redirect can't forward Authorization/Cookie to another host.
+			if (new URL(redirectUrl).origin !== new URL(currentUrl).origin) {
+				credentialsDropped = true;
+			}
+			if (credentialsDropped) {
+				currentInit = stripCredentialHeaders(currentInit);
 			}
 
 			currentUrl = redirectUrl;

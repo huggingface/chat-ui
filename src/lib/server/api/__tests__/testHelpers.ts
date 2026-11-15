@@ -99,6 +99,15 @@ export async function cleanupTestData() {
 
 	await Promise.all([
 		collections.conversations.deleteMany({}),
+		collections.slackThreads.deleteMany({}),
+		collections.slackConnections.deleteMany({}),
+		collections.slackLinks.deleteMany({}),
+		collections.slackInputs.deleteMany({}),
+		collections.slackDeliveries.deleteMany({}),
+		collections.slackLeases.deleteMany({}),
+		collections.slackInstallations.deleteMany({}),
+		collections.mlFiles.deleteMany({}),
+		collections.mlReviews.deleteMany({}),
 		collections.conversationStats.deleteMany({}),
 		collections.abortedGenerations.deleteMany({}),
 		collections.users.deleteMany({}),
@@ -108,10 +117,16 @@ export async function cleanupTestData() {
 		collections.reports.deleteMany({}),
 		collections.assistants.deleteMany({}),
 		collections.messageEvents.deleteMany({}),
+		collections.mlServices.deleteMany({}),
+		collections.mlArtefacts.deleteMany({}),
+		collections.mlAgentRuns.deleteMany({}),
+		collections.mlSources.deleteMany({}),
+		collections.turnStates.deleteMany({}),
 		collections.semaphores.deleteMany({}),
 		collections.migrationResults.deleteMany({}),
 		collections.tokenCaches.deleteMany({}),
 		collections.tools.deleteMany({}),
+		collections.mcpOAuthConnections.deleteMany({}),
 		cleanupGridFS(),
 	]);
 }

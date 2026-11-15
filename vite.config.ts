@@ -6,6 +6,7 @@ import { defineConfig } from "vitest/config";
 import { config } from "dotenv";
 
 config({ path: "./.env.local" });
+config({ path: "./.env" });
 
 // used to load fonts server side for thumbnail generation
 function loadTTFAsArrayBuffer() {
@@ -21,6 +22,12 @@ function loadTTFAsArrayBuffer() {
 	};
 }
 export default defineConfig({
+	define: {
+		// Build flag for ML Assistant mode, fixed at build time rather than read from
+		// runtime config so a build either ships the feature or cannot turn it on.
+		// Read it via `ML_ASSISTANT_MODE` in $lib/utils/mlAssistantFlag.
+		__ML_ASSISTANT_MODE__: JSON.stringify(process.env.ML_ASSISTANT_MODE === "true"),
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit(),
@@ -36,6 +43,9 @@ export default defineConfig({
 		// See Vite server.allowedHosts: string[] | true
 		// Using leading dot matches subdomains per Vite's host check logic
 		allowedHosts: ["huggingface.ngrok.io"],
+		// vite-node loads scripts through this server, and Vite 6.4 refuses files outside the
+		// allow list, which SvelteKit sets to src/ and its own folders
+		fs: { allow: ["scripts", "evals"] },
 	},
 	optimizeDeps: {
 		include: ["uuid", "sharp", "clsx"],
@@ -91,7 +101,7 @@ export default defineConfig({
 				test: {
 					name: "server",
 					environment: "node",
-					include: ["src/**/*.{test,spec}.{js,ts}"],
+					include: ["src/**/*.{test,spec}.{js,ts}", "evals/**/*.{test,spec}.ts"],
 					exclude: ["src/**/*.svelte.{test,spec}.{js,ts}", "src/**/*.ssr.{test,spec}.{js,ts}"],
 					setupFiles: ["./scripts/setups/vitest-setup-server.ts"],
 					testTimeout: 30000,

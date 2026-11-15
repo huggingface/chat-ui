@@ -1,4 +1,5 @@
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
+import type { ManagedBy } from "$lib/types/Conversation";
 import { useAPIClient, handleResponse } from "$lib/APIClient";
 import { getConfigManager } from "$lib/utils/PublicConfig.svelte";
 import type { GETModelsResponse, FeatureFlags } from "$lib/server/api/types";
@@ -9,6 +10,8 @@ interface ConversationListItem {
 	title: string;
 	updatedAt: Date | string;
 	model?: string;
+	mlAssistant?: boolean;
+	managedBy?: ManagedBy;
 }
 
 interface UserInfo {
@@ -23,6 +26,7 @@ interface UserInfo {
 interface SettingsResponse {
 	welcomeModalSeen: boolean;
 	welcomeModalSeenAt: Date | null;
+	mlInternOnboardingSeen: boolean;
 	shareConversationsWithModelAuthors: boolean;
 	activeModel: string;
 	streamingMode: "raw" | "smooth";
@@ -38,6 +42,7 @@ interface SettingsResponse {
 	reasoningEffortOverrides: Record<string, "low" | "medium" | "high">;
 	reasoningOverrides: Record<string, boolean>;
 	billingOrganization?: string;
+	billingResourceGroup?: string;
 }
 
 export const load = async ({ fetch, url }) => {
@@ -83,6 +88,8 @@ export const load = async ({ fetch, url }) => {
 			title: conv.title,
 			model: conv.model ?? defaultModel?.id,
 			updatedAt: new Date(conv.updatedAt),
+			mlAssistant: conv.mlAssistant ?? false,
+			managedBy: conv.managedBy,
 		} satisfies ConvSidebar;
 	});
 

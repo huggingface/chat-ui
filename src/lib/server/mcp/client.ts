@@ -1,17 +1,33 @@
-import { Client } from "@modelcontextprotocol/sdk/client";
-import type { ClientCapabilities } from "@modelcontextprotocol/sdk/types.js";
+import { Client, type ClientCapabilities } from "@modelcontextprotocol/client";
+import { isElicitationEnabled } from "./elicitationConfig";
 
 /**
- * Empty on purpose: a capability declared without a handler makes servers issue a
- * request the SDK can only answer with method-not-found. Add one only in the change
- * that implements its handler.
+ * Declare a capability only in the change that implements its handler, or servers issue
+ * requests the SDK can only answer with method-not-found. Health probes get none: there is
+ * no chat behind them to ask. Spell both elicitation modes out — a bare `elicitation: {}`
+ * reads as form-only and the server SDK then refuses to send a URL elicitation at all.
  */
-export const MCP_CLIENT_CAPABILITIES: ClientCapabilities = {};
+export function mcpClientCapabilities(kind: McpClientKind): ClientCapabilities {
+	return CLIENT_INFO[kind].elicits && isElicitationEnabled()
+		? { elicitation: { form: {}, url: {} } }
+		: {};
+}
 
-// Servers can tell these apart, so a health probe stays distinguishable from a session.
+/**
+ * Servers can tell these apart, so a health probe stays distinguishable from a
+ * session — and ML Intern from ordinary chat, which is the whole point of the
+ * third: its traffic is autonomous, long-running and job-shaped, and a server
+ * operator asked to be able to see it separately.
+ *
+ * `elicits` rather than a name check: whether a client declares the elicitation
+ * capability is a property of what is behind it (a chat that can answer), not
+ * of what it is called, and a new kind that forgot to set it would silently
+ * lose every prompt.
+ */
 const CLIENT_INFO = {
-	session: { name: "chat-ui-mcp", version: "0.1.0" },
-	health: { name: "chat-ui-health-check", version: "1.0.0" },
+	session: { name: "chat-ui-mcp", version: "0.1.0", elicits: true },
+	intern: { name: "chat-ui-intern", version: "0.1.0", elicits: true },
+	health: { name: "chat-ui-health-check", version: "1.0.0", elicits: false },
 } as const;
 
 export type McpClientKind = keyof typeof CLIENT_INFO;
@@ -22,5 +38,29 @@ export type McpClientKind = keyof typeof CLIENT_INFO;
  * would look declared and never fire.
  */
 export function createMcpClient(kind: McpClientKind = "session"): Client {
-	return new Client(CLIENT_INFO[kind], { capabilities: MCP_CLIENT_CAPABILITIES });
+	const capabilities = mcpClientCapabilities(kind);
+	const { name, version } = CLIENT_INFO[kind];
+	const client = new Client(
+		{ name, version },
+		{
+			capabilities,
+			// The SDK defaults to `legacy`, i.e. never negotiating. Probe instead, and let the
+			// probe fall back on its own for the 2025-era servers that are still the majority.
+			versionNegotiation: { mode: "auto" },
+			// A 2026-era prompt outlives this call, so the driver must not block our handler
+			// waiting for one. `callMcpTool` opts each call into receiving `input_required`.
+			inputRequired: { autoFulfill: false },
+		}
+	);
+
+	if (capabilities.elicitation) {
+		// Imported on demand, or every module building a client drags in a Mongo connection.
+		client.setRequestHandler("elicitation/create", async (request, ctx) => {
+			const { handleElicitationRequest } = await import("./elicitation");
+			// Fires on `notifications/cancelled`, i.e. the server gave up.
+			return handleElicitationRequest(client, request.params, ctx.mcpReq.signal);
+		});
+	}
+
+	return client;
 }

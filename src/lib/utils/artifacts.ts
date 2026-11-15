@@ -1,4 +1,5 @@
 import type { Message } from "$lib/types/Message";
+import { rebuildLegacyContent } from "./messageShape";
 
 /**
  * Artifacts: substantial, self-contained pieces of content (apps, documents,
@@ -247,7 +248,7 @@ function normalizeTypography(s: string): string {
  * sides are also typography-normalized (curly quotes, en/em dashes) before
  * matching.
  */
-function findMatch(content: string, needle: string): { start: number; end: number } | null {
+export function findMatch(content: string, needle: string): { start: number; end: number } | null {
 	// Substitutions are 1:1, so offsets in the normalized strings index the raw
 	// `content` directly — no offset remapping needed.
 	const nContent = normalizeTypography(content);
@@ -351,7 +352,10 @@ function normalizeIdentifier(id: string): string {
  * version is final and flagged `interrupted` instead of spinning forever.
  */
 export function collectArtifacts(
-	messages: Array<Pick<Message, "id" | "from" | "content">>,
+	messages: Array<
+		Pick<Message, "id" | "from" | "content"> &
+			Partial<Pick<Message, "reasoning" | "updates" | "contentShape">>
+	>,
 	liveMessageId?: Message["id"]
 ): ArtifactRegistry {
 	const artifacts = new Map<string, Artifact>();
@@ -359,13 +363,16 @@ export function collectArtifacts(
 	let streaming: ArtifactCardRef | undefined;
 
 	for (const message of messages) {
-		if (message.from !== "assistant" || !message.content.includes("<artifact")) continue;
+		if (message.from !== "assistant") continue;
+		// preambles can hold artifacts and the rounds shape keeps them out of content
+		const content = rebuildLegacyContent(message).content;
+		if (!content.includes("<artifact")) continue;
 
 		// Drop <think> reasoning before parsing: models rehearse artifact tags in
 		// there, which must not become phantom versions. Mirrors ChatMessage,
 		// which splits think blocks out before expanding artifact cards, keeping
 		// opIndex numbering consistent between the two.
-		const visibleContent = message.content.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "");
+		const visibleContent = content.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "");
 
 		let opIndex = 0;
 		for (const segment of splitArtifactSegments(visibleContent)) {

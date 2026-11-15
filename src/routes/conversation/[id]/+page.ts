@@ -57,6 +57,11 @@ export const load: PageLoad = async ({ params, depends, fetch, url, parent }) =>
 			.get({ query: { fromShare } })
 			.then(handleResponse)) as ConversationData;
 	} catch {
+		const parentData = await parent();
+		if (parentData.loginEnabled && !parentData.user) {
+			const next = url.pathname + url.search;
+			redirect(302, `${base}/login?next=${encodeURIComponent(next)}`);
+		}
 		redirect(302, `${base}/`);
 	}
 };

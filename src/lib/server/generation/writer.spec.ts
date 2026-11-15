@@ -130,4 +130,44 @@ describe.sequential("generation writer cursor", () => {
 		expect(materializedSeq).toBeGreaterThan(0);
 		expect(replayed).toBe(materializedContent);
 	});
+
+	it("does not write the running buffer over a message the end-of-turn save converted", async () => {
+		const conversationId = new ObjectId();
+		const messageId = randomUUID();
+		const now = new Date();
+		const running = "<think>Plan.</think>Let me check.<think>Done.</think>Sunny.";
+
+		await collections.conversations.insertOne({
+			_id: conversationId,
+			messages: [
+				{ id: messageId, from: "assistant", content: running, createdAt: now, updatedAt: now },
+			],
+			createdAt: now,
+			updatedAt: now,
+		} as never);
+
+		const writer = await createGenerationWriter({
+			generationId: randomUUID(),
+			conversationId,
+			messageId,
+			snapshot: () => ({ content: running }),
+		});
+		writer.push(text("Sunny."));
+		// the route order, the end of turn save lands before finish materialises again
+		await collections.conversations.updateOne(
+			{ _id: conversationId, "messages.id": messageId },
+			{
+				$set: {
+					"messages.$.content": "Sunny.",
+					"messages.$.reasoning": "Done.",
+					"messages.$.contentShape": 2,
+				},
+			}
+		);
+		await writer.finish({ status: "completed" });
+
+		const [stored] =
+			(await collections.conversations.findOne({ _id: conversationId }))?.messages ?? [];
+		expect(stored).toMatchObject({ content: "Sunny.", reasoning: "Done.", contentShape: 2 });
+	});
 });

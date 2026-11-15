@@ -1,5 +1,6 @@
 import type { ProcessedModel } from "$lib/server/models";
 import type { GETModelResponse, GETModelsResponse } from "$lib/server/api/types";
+import { listedDefaultProvider } from "$lib/server/requestProvider";
 
 // API responses must never serialize a model object directly: the raw
 // ProcessedModel carries server-only configuration (an `endpoints` array that
@@ -29,6 +30,7 @@ export function serializeModelSummary(model: ProcessedModel): GETModelsResponse[
 		unlisted: model.unlisted,
 		hasInferenceAPI: model.hasInferenceAPI,
 		isRouter: model.isRouter,
+		defaultProvider: listedDefaultProvider(model),
 	};
 }
 

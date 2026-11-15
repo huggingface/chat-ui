@@ -1,6 +1,7 @@
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
 import type OpenAI from "openai";
 import type { Stream } from "openai/streaming";
+import { createThinkTagEscaper, escapeThinkTags } from "$lib/utils/escapeThinkTags";
 
 /**
  * Transform a stream of OpenAI.Chat.ChatCompletion into a stream of TextGenerationStreamOutput
@@ -19,6 +20,7 @@ export async function* openAIChatToTextGenerationStream(
 	// blank chunk can't create an empty <think> on its own while the trace still
 	// stays byte-exact. Mirrors runMcpFlow, which does the same for the tool path.
 	let pendingReasoningWhitespace = "";
+	const reasoningEscaper = createThinkTagEscaper();
 
 	for await (const completion of completionStream) {
 		const retyped = completion as {
@@ -112,9 +114,9 @@ export async function* openAIChatToTextGenerationStream(
 		// but it must not be discarded either, hence the buffer.
 		if (reasoning.length > 0) {
 			if (thinkOpen) {
-				combined += reasoning;
+				combined += reasoningEscaper.push(reasoning);
 			} else if (reasoning.trim().length > 0) {
-				combined += "<think>" + pendingReasoningWhitespace + reasoning;
+				combined += "<think>" + pendingReasoningWhitespace + reasoningEscaper.push(reasoning);
 				pendingReasoningWhitespace = "";
 				thinkOpen = true;
 			} else {
@@ -127,15 +129,17 @@ export async function* openAIChatToTextGenerationStream(
 			// Allow <think> tags in content to pass through (for models like DeepSeek R1)
 			if (thinkOpen && trimmed === "</think>") {
 				// close once without duplicating the tag
-				combined += "</think>";
+				combined += reasoningEscaper.flush() + "</think>";
 				thinkOpen = false;
 			} else if (thinkOpen) {
-				combined += "</think>" + content;
+				combined += reasoningEscaper.flush() + "</think>" + content;
 				thinkOpen = false;
 			} else {
 				combined += content;
 			}
 		}
+
+		if (last) combined += reasoningEscaper.flush();
 
 		// Accumulate the combined token into the full text
 		generatedText += combined;
@@ -152,6 +156,16 @@ export async function* openAIChatToTextGenerationStream(
 		yield output;
 
 		// Tools removed: ignore tool_calls deltas
+	}
+
+	const heldReasoning = reasoningEscaper.flush();
+	if (heldReasoning) {
+		generatedText += heldReasoning;
+		yield {
+			token: { id: tokenId++, text: heldReasoning, logprob: 0, special: false },
+			generated_text: null,
+			details: null,
+		} as TextGenerationStreamOutput;
 	}
 
 	// If metadata wasn't yielded from chunks (e.g., from headers), yield it at the end
@@ -206,7 +220,7 @@ export async function* openAIChatToTextGenerationSingle(
 	// byte-exact, since vendors documenting preserved thinking can require the
 	// payload back unmodified.
 	if (r.trim().length > 0) {
-		content = `<think>${r}</think>` + content;
+		content = `<think>${escapeThinkTags(r)}</think>` + content;
 	}
 	const tokenId = 0;
 

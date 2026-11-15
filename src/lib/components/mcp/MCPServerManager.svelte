@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { onDestroy, onMount, untrack } from "svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import ServerCard from "./ServerCard.svelte";
 	import AddServerForm from "./AddServerForm.svelte";
+	import AuthorizeStep from "./AuthorizeStep.svelte";
 	import {
 		allMcpServers,
 		selectedServerIds,
@@ -10,8 +12,14 @@
 		addCustomServer,
 		refreshMcpServers,
 		healthCheckServer,
+		setServerOAuth,
+		toggleServer,
+		reconcileOAuthConnections,
 	} from "$lib/stores/mcpServers";
-	import type { KeyValuePair } from "$lib/types/Tool";
+	import { isSameServerUrl } from "$lib/utils/mcpValidation";
+	import type { KeyValuePair, MCPOAuthState, MCPServer } from "$lib/types/Tool";
+	import type { DiscoveryResponse, OAuthCallbackPayload } from "$lib/utils/mcpOAuth";
+	import { error } from "$lib/stores/errors";
 	import IconAddLarge from "~icons/carbon/add-large";
 	import IconRefresh from "~icons/carbon/renew";
 	import LucideHammer from "~icons/lucide/hammer";
@@ -21,25 +29,136 @@
 
 	interface Props {
 		onclose: () => void;
+		linkServer?: { name: string; url: string };
 	}
 
-	let { onclose }: Props = $props();
+	let { onclose, linkServer }: Props = $props();
 
-	type View = "list" | "add";
-	let currentView = $state<View>("list");
+	let linkPending = $state(untrack(() => Boolean(linkServer)));
+	const linkExisting = $derived.by(() => {
+		const url = linkServer?.url;
+		return url ? $allMcpServers.find((s) => isSameServerUrl(s.url, url)) : undefined;
+	});
+
+	let closed = false;
+	onDestroy(() => {
+		closed = true;
+	});
+
+	function handleClose() {
+		closed = true;
+		onclose();
+	}
+
+	type View = "list" | "add" | "authorize";
+	let currentView = $state<View>(untrack(() => (linkServer ? "add" : "list")));
 	let isRefreshing = $state(false);
+	let pendingAuth = $state<{
+		serverId: string;
+		serverUrl: string;
+		discovery: DiscoveryResponse;
+	} | null>(null);
 
 	const baseServers = $derived($allMcpServers.filter((s) => s.type === "base"));
 	const customServers = $derived($allMcpServers.filter((s) => s.type === "custom"));
 	const enabledCount = $derived($enabledServersCount);
 
-	function handleAddServer(serverData: { name: string; url: string; headers?: KeyValuePair[] }) {
-		addCustomServer(serverData);
+	// On open, re-sync OAuth state so a server challenged or revoked in the background shows the
+	// correct status instead of a stale "Authorized".
+	onMount(() => {
+		reconcileOAuthConnections();
+	});
+
+	function handleAddServer(serverData: {
+		name: string;
+		url: string;
+		headers?: KeyValuePair[];
+		discovery?: DiscoveryResponse;
+	}) {
+		if (closed) return;
+		const fromLink = linkPending;
+		linkPending = false;
+		const oauth: MCPOAuthState | undefined =
+			serverData.discovery?.requiresAuth && serverData.discovery.connection
+				? serverData.discovery.connection
+				: undefined;
+		const id = addCustomServer({
+			name: serverData.name,
+			url: serverData.url,
+			headers: serverData.headers,
+			oauth,
+			authRequired: !!oauth,
+		});
+		if (oauth && serverData.discovery) {
+			pendingAuth = {
+				serverId: id,
+				serverUrl: serverData.url,
+				discovery: serverData.discovery,
+			};
+			currentView = "authorize";
+		} else if (serverData.discovery?.requiresAuth) {
+			// Needs auth but discovery couldn't load enough metadata — tell the user, don't add a broken server.
+			currentView = "list";
+			$error = `${serverData.url} requires authorization but its OAuth metadata could not be loaded. Try Health Check or contact the server admin.`;
+		} else {
+			if (fromLink) toggleServer(id);
+			currentView = "list";
+		}
+	}
+
+	function handleEnableExisting(server: MCPServer) {
+		linkPending = false;
+		if (server.oauth && server.oauth.status !== "authorized") {
+			handleReauthorizeFromCard({
+				serverId: server.id,
+				serverUrl: server.url,
+				oauth: server.oauth,
+			});
+			return;
+		}
+		if (!$selectedServerIds.has(server.id)) toggleServer(server.id);
+		currentView = "list";
+	}
+
+	function handleAuthorized(payload: OAuthCallbackPayload) {
+		if (!pendingAuth || !payload.ok || !payload.connection) return;
+		const serverId = pendingAuth.serverId;
+		setServerOAuth(serverId, payload.connection);
+		if (!$selectedServerIds.has(serverId)) {
+			toggleServer(serverId);
+		}
+		const server = $allMcpServers.find((s) => s.id === serverId);
+		if (server) healthCheckServer({ ...server });
+		pendingAuth = null;
+		currentView = "list";
+	}
+
+	function handleAuthorizeCancel() {
+		pendingAuth = null;
 		currentView = "list";
 	}
 
 	function handleCancel() {
+		if (linkPending) return handleClose();
 		currentView = "list";
+	}
+
+	function handleReauthorizeFromCard(detail: {
+		serverId: string;
+		serverUrl: string;
+		oauth: MCPOAuthState;
+	}) {
+		const discovery: DiscoveryResponse = {
+			requiresAuth: true,
+			connection: detail.oauth,
+		};
+		setServerOAuth(detail.serverId, detail.oauth);
+		pendingAuth = {
+			serverId: detail.serverId,
+			serverUrl: detail.serverUrl,
+			discovery,
+		};
+		currentView = "authorize";
 	}
 
 	async function handleRefresh() {
@@ -56,13 +175,17 @@
 	}
 </script>
 
-<Modal width={currentView === "list" ? "w-[800px]" : "w-[600px]"} {onclose} closeButton>
+<Modal width={currentView === "list" ? "w-[800px]" : "w-[600px]"} onclose={handleClose} closeButton>
 	<div class="p-6">
 		<!-- Header -->
 		<div class="mb-6">
 			<h2 class="mb-1 text-xl font-semibold text-gray-900 dark:text-gray-200">
 				{#if currentView === "list"}
 					MCP Servers
+				{:else if currentView === "authorize"}
+					Authorize MCP server
+				{:else if linkPending}
+					Add MCP server from link
 				{:else}
 					Add MCP server
 				{/if}
@@ -70,6 +193,14 @@
 			<p class="text-sm text-gray-600 dark:text-gray-400">
 				{#if currentView === "list"}
 					Manage MCP servers to extend {publicConfig.PUBLIC_APP_NAME} with external tools.
+				{:else if currentView === "authorize"}
+					Sign in to {pendingAuth?.serverUrl} so {publicConfig.PUBLIC_APP_NAME} can call its tools on
+					your behalf.
+				{:else if linkPending && linkExisting}
+					A link asked to turn on a server you already added to {publicConfig.PUBLIC_APP_NAME}.
+				{:else if linkPending}
+					A link asked to add this server to {publicConfig.PUBLIC_APP_NAME}. Add it only if you
+					trust whoever shared the link.
 				{:else}
 					Add a custom MCP server to {publicConfig.PUBLIC_APP_NAME}.
 				{/if}
@@ -128,7 +259,11 @@
 						</h3>
 						<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 							{#each baseServers as server (server.id)}
-								<ServerCard {server} isSelected={$selectedServerIds.has(server.id)} />
+								<ServerCard
+									{server}
+									isSelected={$selectedServerIds.has(server.id)}
+									onreauthorize={handleReauthorizeFromCard}
+								/>
 							{/each}
 						</div>
 					</div>
@@ -161,7 +296,11 @@
 					{:else}
 						<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 							{#each customServers as server (server.id)}
-								<ServerCard {server} isSelected={$selectedServerIds.has(server.id)} />
+								<ServerCard
+									{server}
+									isSelected={$selectedServerIds.has(server.id)}
+									onreauthorize={handleReauthorizeFromCard}
+								/>
 							{/each}
 						</div>
 					{/if}
@@ -179,7 +318,48 @@
 				</div>
 			</div>
 		{:else if currentView === "add"}
-			<AddServerForm onsubmit={handleAddServer} oncancel={handleCancel} />
+			{#if linkPending && linkExisting}
+				{@const existing = linkExisting}
+				<div class="space-y-4">
+					<div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+						<p class="text-sm font-medium text-gray-900 dark:text-gray-100">{existing.name}</p>
+						<p class="mt-1 text-xs break-all text-gray-600 dark:text-gray-400">{existing.url}</p>
+					</div>
+					<div class="flex justify-end gap-2">
+						<button
+							type="button"
+							onclick={handleCancel}
+							class="rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							onclick={() => handleEnableExisting(existing)}
+							class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+						>
+							Enable Server
+						</button>
+					</div>
+				</div>
+			{:else if linkServer && linkPending}
+				<AddServerForm
+					onsubmit={handleAddServer}
+					oncancel={handleCancel}
+					initialName={linkServer.name}
+					initialUrl={linkServer.url}
+				/>
+			{:else}
+				<AddServerForm onsubmit={handleAddServer} oncancel={handleCancel} />
+			{/if}
+		{:else if currentView === "authorize" && pendingAuth}
+			<AuthorizeStep
+				discovery={pendingAuth.discovery}
+				serverUrl={pendingAuth.serverUrl}
+				serverId={pendingAuth.serverId}
+				onauthorized={handleAuthorized}
+				oncancel={handleAuthorizeCancel}
+			/>
 		{/if}
 	</div>
 </Modal>

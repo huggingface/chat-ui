@@ -6,24 +6,50 @@
 
 	import CarbonTrashCan from "~icons/carbon/trash-can";
 	import CarbonEdit from "~icons/carbon/edit";
+	import BiRobot from "~icons/bi/robot";
 	import LucideEllipsis from "~icons/lucide/ellipsis";
 	import type { ConvSidebar } from "$lib/types/ConvSidebar";
 
 	import EditConversationModal from "$lib/components/EditConversationModal.svelte";
 	import DeleteConversationModal from "$lib/components/DeleteConversationModal.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
-	import { useActiveGenerationsStore } from "$lib/stores/activeGenerations.svelte";
+	import {
+		useActiveGenerationsStore,
+		type LiveTurnStatus,
+	} from "$lib/stores/activeGenerations.svelte";
 
 	const activeGenerations = useActiveGenerationsStore();
+
+	// One entry per turn status an ML Intern row can be in (idle = no live turn).
+	// One hue per state so they read apart at dot size: orange = generating,
+	// blue = needs an answer, red = failed, gray = parked on a timer. The two
+	// states that move (or want the user) pulse; the settled ones hold still.
+	const ML_TURN_BADGE: Record<LiveTurnStatus | "idle", { label: string; dot?: string }> = {
+		running: { label: "Generating…", dot: "animate-pulse bg-[#ea580c] dark:bg-[#fb923c]" },
+		waiting: { label: "Waiting to resume", dot: "bg-gray-400 dark:bg-gray-500" },
+		awaiting_input: {
+			label: "Needs your answer",
+			dot: "animate-pulse bg-blue-500 dark:bg-blue-400",
+		},
+		failed: { label: "Failed", dot: "bg-red-500 dark:bg-red-400" },
+		idle: { label: "Idle" },
+	};
 
 	interface Props {
 		conv: ConvSidebar;
 		readOnly?: true;
+		allowDelete?: boolean;
 		ondeleteConversation?: (id: string) => void;
 		oneditConversationTitle?: (payload: { id: string; title: string }) => void;
 	}
 
-	let { conv, readOnly, ondeleteConversation, oneditConversationTitle }: Props = $props();
+	let {
+		conv,
+		readOnly,
+		allowDelete = false,
+		ondeleteConversation,
+		oneditConversationTitle,
+	}: Props = $props();
 
 	let deleteOpen = $state(false);
 	let renameOpen = $state(false);
@@ -62,7 +88,25 @@
 	class="group flex h-8 flex-none items-center gap-1.5 rounded-lg pr-1.5 pl-2 text-base text-gray-600 hover:bg-gray-100 max-sm:h-10 sm:text-sm dark:text-gray-300 dark:hover:bg-gray-700
 		{conv.id === page.params.id ? 'bg-gray-100 dark:bg-gray-700' : ''}"
 >
-	{#if activeGenerations.has(conv.id)}
+	{#if conv.mlAssistant}
+		{@const ml = ML_TURN_BADGE[activeGenerations.statusFor(conv.id) ?? "idle"]}
+		<!-- The mode's own gold, in the strip's palette. A filled glyph rather than
+		     an outline: at 14px a hairline robot in this orange reads as a
+		     mis-tinted icon, where a solid one reads as a mark. An icon rather
+		     than an "ML" chip, so a run of mode conversations doesn't read as a
+		     wall of repeated text. The status dot keeps its own hue and sits
+		     beside the mark, so the two never compete for the same pixels. -->
+		<span
+			class="flex flex-none items-center gap-1 text-[#c2410c] dark:text-[#fdba74]"
+			title="ML Intern — {ml.label}"
+		>
+			<BiRobot class="size-[15px]" />
+			{#if ml.dot}
+				<span class="size-1.5 rounded-full {ml.dot}"></span>
+			{/if}
+			<span class="sr-only">ML Intern — {ml.label}</span>
+		</span>
+	{:else if activeGenerations.has(conv.id)}
 		<span
 			class="size-1.5 flex-none animate-pulse rounded-full bg-blue-500 dark:bg-blue-400"
 			title="Generating…"
@@ -103,7 +147,7 @@
 			<span>{conv.title}</span>
 		</a>
 
-		{#if !readOnly}
+		{#if !readOnly || allowDelete}
 			<DropdownMenu.Root
 				bind:open={isMenuOpen}
 				onOpenChange={(open) => {
@@ -131,13 +175,14 @@
 						onCloseAutoFocus={(e) => e.preventDefault()}
 						interactOutsideBehavior="defer-otherwise-close"
 					>
-						<DropdownMenu.Item
-							class="flex h-9 items-center gap-2 rounded-md px-2 text-sm text-gray-700 select-none focus-visible:outline-hidden data-highlighted:bg-gray-100 sm:h-8 dark:text-gray-200 dark:data-highlighted:bg-white/10"
-							onSelect={() => (renameOpen = true)}
-						>
-							<CarbonEdit class="size-4 opacity-90 dark:opacity-80" />
-							Rename
-						</DropdownMenu.Item>
+						{#if !readOnly}
+							<DropdownMenu.Item
+								class="flex h-9 items-center gap-2 rounded-md px-2 text-sm text-gray-700 select-none focus-visible:outline-hidden data-highlighted:bg-gray-100 sm:h-8 dark:text-gray-200 dark:data-highlighted:bg-white/10"
+								onSelect={() => (renameOpen = true)}
+							>
+								<CarbonEdit class="size-4 opacity-90 dark:opacity-80" />
+								Rename
+							</DropdownMenu.Item>{/if}
 						<DropdownMenu.Item
 							class="flex h-9 items-center gap-2 rounded-md px-2 text-sm text-red-500 select-none focus-visible:outline-hidden data-highlighted:bg-red-50 data-highlighted:text-red-600 sm:h-8 dark:text-red-400 dark:data-highlighted:bg-red-500/10 dark:data-highlighted:text-red-400"
 							onSelect={() => (deleteOpen = true)}

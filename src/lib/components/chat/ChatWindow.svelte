@@ -1,27 +1,48 @@
 <script lang="ts">
 	import type { Message, MessageFile } from "$lib/types/Message";
-	import { onDestroy, untrack } from "svelte";
+	import { onDestroy, tick, untrack } from "svelte";
 
 	import ArtifactPanel from "./ArtifactPanel.svelte";
+	import SidePaneHost from "./SidePaneHost.svelte";
+	import MlRegistryPane from "./MlRegistryPane.svelte";
+	import MlReviewPane from "./MlReviewPane.svelte";
 	import { collectArtifacts } from "$lib/utils/artifacts";
 	import { setArtifactsContext } from "$lib/utils/artifactsContext";
-	import { artifactPanel } from "$lib/stores/artifactPanel.svelte";
+	import { collectTrackioDashboards } from "$lib/utils/trackio";
+	import { collectWorkflowSpaces } from "$lib/utils/workflowSpace";
+	import { collectPapers } from "$lib/utils/paper";
+	import { trackioStatus } from "$lib/stores/trackioStatus.svelte";
+	import { collectPaneItems } from "$lib/utils/paneItems";
+	import { sidePane } from "$lib/stores/sidePane.svelte";
 
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import IconCheap from "$lib/components/icons/IconCheap.svelte";
 	import IconFast from "$lib/components/icons/IconFast.svelte";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
 	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
+	import { shownProvider } from "$lib/utils/shownProvider";
 	import CarbonDirectionRight from "~icons/carbon/direction-right-01";
 	import IconArrowUp from "~icons/lucide/arrow-up";
 	import IconMic from "~icons/lucide/mic";
 
 	import ChatInput from "./ChatInput.svelte";
+	import AskQuestion from "./AskQuestion.svelte";
+	import SideQuestionPanel from "./SideQuestionPanel.svelte";
+	import { isWebSideQuestion } from "$lib/utils/sideQuestion";
+	import { BTW_COMMAND } from "$lib/utils/slashCommands";
+	import { firstQuestionFor } from "$lib/stores/pendingQuestion";
+	import { shouldShowPendingPlaceholder } from "$lib/utils/pendingPlaceholder";
 	import VoiceRecorder from "./VoiceRecorder.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
+	import ResumeBtn from "../ResumeBtn.svelte";
+	import {
+		buildResumeMessage,
+		canResumeAfterFailure,
+		failureDetailOf,
+	} from "$lib/utils/resumeAfterFailure";
 	import file2base64 from "$lib/utils/file2base64";
 	import { base } from "$app/paths";
 	import ChatMessage from "./ChatMessage.svelte";
@@ -30,12 +51,28 @@
 	import ScrollToPreviousBtn from "../ScrollToPreviousBtn.svelte";
 	import { browser } from "$app/environment";
 	import { createChatScroll } from "$lib/utils/scroll/chatScroll.svelte";
-	import { MIN_SPACER_FALLBACK_PX } from "$lib/utils/scroll/spacer";
+	import { isAssistantGenerationTerminal, turnStateOf } from "$lib/utils/generationState";
+	import { queuedInputs } from "$lib/stores/queuedInputs.svelte";
+	import QueuedInputs from "./QueuedInputs.svelte";
 	import { NAV_EDGE_SWIPE_ZONE_PX } from "$lib/constants/gestures";
 	import SystemPromptModal from "../SystemPromptModal.svelte";
 	import ShareConversationModal from "../ShareConversationModal.svelte";
 	import ChatIntroduction from "./ChatIntroduction.svelte";
 	import UploadedFile from "./UploadedFile.svelte";
+	import {
+		MAX_VIEWS_PER_MESSAGE,
+		newTrackioViewKey,
+		trackioViewToken,
+		viewsInText,
+		type TrackioDashboardView,
+	} from "$lib/utils/trackioView";
+	import {
+		MAX_QUOTES_PER_MESSAGE,
+		newPaperQuoteKey,
+		paperQuoteToken,
+		quotesInText,
+		type PaperQuote,
+	} from "$lib/utils/paper";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { error } from "$lib/stores/errors";
 	import ModelSwitch from "./ModelSwitch.svelte";
@@ -52,6 +89,25 @@
 	import { mimeMatchesAllowlist } from "$lib/utils/mimeMatch";
 	import LucideHammer from "~icons/lucide/hammer";
 	import LucideSparkles from "~icons/lucide/sparkles";
+	import MlAssistantStrip from "./MlAssistantStrip.svelte";
+	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
+	import { mlAssistant } from "$lib/stores/mlAssistant.svelte";
+	import { mlRegistry } from "$lib/stores/mlRegistry.svelte";
+	import { mlReviews } from "$lib/stores/mlReview.svelte";
+	import MlInternSpotlight from "./MlInternSpotlight.svelte";
+	import { useConversationsStore } from "$lib/stores/conversations.svelte";
+	import { MediaQuery } from "svelte/reactivity";
+	import { planStepsToMlSteps } from "$lib/utils/planProgress";
+	import type { PlanState } from "$lib/types/Plan";
+	import type { MlBudget } from "$lib/types/Conversation";
+	import type { MlBudgetSnapshot } from "$lib/types/MlAssistant";
+	import { reservedMicroUsd, usdToMicroUsd } from "$lib/utils/mlBudget";
+	import { handleResponse, useAPIClient } from "$lib/APIClient";
+	import {
+		ML_ASSISTANT_EFFORT,
+		ML_ASSISTANT_PLACEHOLDER,
+		mlAssistantExamples,
+	} from "$lib/constants/mlAssistant";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -60,11 +116,16 @@
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { tap, error as hapticError } from "$lib/utils/haptics";
 	import { page } from "$app/state";
+
+	// Only this conversation's question; the store outlives a navigation by a tick.
+	let questionStore = $derived(firstQuestionFor(page.params.id));
+	let askQuestion = $derived($questionStore);
 	import {
 		isMessageToolCallUpdate,
 		isMessageToolErrorUpdate,
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
+	import { MessageUpdateType } from "$lib/types/MessageUpdate";
 	import type { ToolFront } from "$lib/types/Tool";
 
 	interface Props {
@@ -72,15 +133,21 @@
 		messagesAlternatives?: Message["id"][][];
 		loading?: boolean;
 		pending?: boolean;
+		resuming?: boolean;
 		shared?: boolean;
+		slackThreadUrl?: string;
 		currentModel: Model;
 		models: Model[];
 		preprompt?: string | undefined;
 		files?: File[];
+		dashboardViews?: TrackioDashboardView[];
+		paperQuotes?: PaperQuote[];
 		onmessage?: (content: string) => void;
 		onstop?: () => void;
 		onretry?: (payload: { id: Message["id"]; content?: string }) => void;
 		onshowAlternateMsg?: (payload: { id: Message["id"] }) => void;
+		/** the server started a turn from the queue */
+		onqueuedturn?: () => void;
 		draft?: string;
 	}
 
@@ -89,19 +156,26 @@
 		messagesAlternatives = [],
 		loading = false,
 		pending = false,
+		resuming = false,
 		shared = false,
+		slackThreadUrl,
 		currentModel,
 		models,
 		preprompt = undefined,
 		files = $bindable([]),
+		dashboardViews = $bindable([]),
+		paperQuotes = $bindable([]),
 		draft = $bindable(""),
 		onmessage,
 		onstop,
 		onretry,
 		onshowAlternateMsg,
+		onqueuedturn,
 	}: Props = $props();
 
-	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
+	let isReadOnly = $derived(
+		!!slackThreadUrl || !models.some((model) => model.id === currentModel.id)
+	);
 
 	const publicConfig = usePublicConfig();
 	let canShare = $derived(
@@ -127,7 +201,7 @@
 		get registry() {
 			return artifactRegistry;
 		},
-		panel: artifactPanel,
+		panel: sidePane,
 		// Deep consumers (e.g. the code-block preview modal) can't render a
 		// meaningful disabled state, so streaming also gates availability here;
 		// the panel gets the handler as a prop and disables on `loading` itself.
@@ -141,8 +215,24 @@
 	$effect(() => {
 		const streaming = artifactRegistry.streaming;
 		if (!streaming || !loading) return;
-		artifactPanel.maybeAutoOpen(streaming.identifier, streaming.version);
+		sidePane.maybeAutoOpen(streaming.identifier, streaming.version);
 	});
+
+	// Trackio dashboards a training run printed into its job logs, read back out
+	// of the tool results on the messages. Derived like the artifact registry, so
+	// reopening the conversation finds the same dashboards.
+	let trackioDashboards = $derived(collectTrackioDashboards(messages));
+
+	let workflowSpaces = $derived(collectWorkflowSpaces(messages));
+
+	// Papers opened by open_paper, read from that tool's own output.
+	let papers = $derived(collectPapers(messages));
+
+	// One ordered list of everything the pane can show, for the tab labels and the
+	// strip's "open another item" menu.
+	let paneItems = $derived(
+		collectPaneItems(messages, artifactRegistry, trackioDashboards, workflowSpaces, papers)
+	);
 
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
@@ -156,10 +246,24 @@
 	);
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
 
+	let sideQuestionPanel: ReturnType<typeof SideQuestionPanel> | undefined = $state();
+	let draftIsSideQuestion = $derived(Boolean(sideQuestionPanel) && isWebSideQuestion(draft));
+
 	const handleSubmit = () => {
+		if (sideQuestionPanel?.intercept(draft)) {
+			draft = "";
+			return;
+		}
+		if (queueing && draft.trim()) {
+			queueDraft();
+			return;
+		}
 		if (requireAuthUser() || loading || !draft) return;
 		tap();
-		chatScroll.armSend();
+		chatScroll.notifySend();
+		// Latches the mode onto the conversation, so the strip stays and swaps its
+		// tool note for the plan progress row. No-op when the mode is off.
+		mlAssistant.startTask();
 		onmessage?.(draft);
 		draft = "";
 	};
@@ -214,8 +318,7 @@
 
 	let lastMessage = $derived(browser && (messages.at(-1) as Message));
 	let showPendingPlaceholder = $derived(
-		pending &&
-			!(lastMessage && lastMessage.from === "assistant" && (lastMessage.content ?? "").length === 0)
+		shouldShowPendingPlaceholder({ pending, resuming, lastMessage: lastMessage || undefined })
 	);
 	let streamingAssistantMessage = $derived(
 		(() => {
@@ -249,19 +352,25 @@
 	function sendFixRequest(text: string): boolean {
 		if (requireAuthUser() || loading) return false;
 		tap();
-		chatScroll.armSend();
-		// Queued attachments belong to the user's next message, not to this
+		chatScroll.notifySend();
+		// Queued attachments (and dashboard views) belong to the user's next message, not to this
 		// machine-composed one. The send handler snapshots the bound `files`
 		// synchronously before its first await, so emptying around the call is
 		// enough to keep them out of the request — and it skips clearing them
 		// post-send when it consumed none (see writeMessage), so the restored
 		// queue survives.
 		const queuedFiles = files;
+		const queuedViews = dashboardViews;
+		const queuedQuotes = paperQuotes;
 		files = [];
+		dashboardViews = [];
+		paperQuotes = [];
 		try {
 			onmessage?.(text);
 		} finally {
 			files = queuedFiles;
+			dashboardViews = queuedViews;
+			paperQuotes = queuedQuotes;
 		}
 		return true;
 	}
@@ -336,28 +445,64 @@
 	let pendingEl: HTMLElement | undefined = $state();
 	let composerHeight = $state<number | undefined>(undefined);
 
-	// Structural sync: conversation identity + message-list shape. Reads only
-	// ids/from (content is read untracked), so token flushes never re-run it;
-	// the meaning of each change comes from explicit intents armed at the
-	// send/retry/branch call sites.
+	// Turn grouping: a user message starts a turn, following assistant messages
+	// join it (plus a headless leading turn for edge shapes). Each turn renders
+	// as one group so the anchored turn's reservation is a single CSS
+	// min-height. Reads only
+	// ids/from, so token flushes never regroup.
+	let turns = $derived.by(() => {
+		const groups: { key: string; messages: Message[] }[] = [];
+		for (const message of messages) {
+			const last = groups.at(-1);
+			if (message.from === "user" || !last) {
+				groups.push({ key: message.id, messages: [message] });
+			} else {
+				last.messages.push(message);
+			}
+		}
+		return groups;
+	});
+
+	// Structural sync: conversation identity, the trailing turn, and which turn
+	// (if any) a reply is currently streaming into — the whole condition for a
+	// turn to anchor. Reads ids/from/loading only (terminal-ness untracked), so
+	// token flushes never re-run it. The terminal check keeps the pre-mount gap
+	// after a submit — when the trailing message is still the previous, settled
+	// reply — from anchoring that turn.
 	$effect(() => {
+		const lastMessage = messages.at(-1);
+		const lastTurnKey = turns.at(-1)?.key ?? null;
+		const streaming =
+			loading &&
+			lastMessage?.from === "assistant" &&
+			untrack(() => !isAssistantGenerationTerminal(lastMessage));
 		chatScroll.sync({
 			conversationKey: page.params?.id,
-			messages: messages.map((m) => ({ id: m.id, from: m.from })),
-			lastMessageEmpty: untrack(() => (messages.at(-1)?.content ?? "") === ""),
+			turnCount: turns.length,
+			lastTurnKey,
+			streamingTurnKey: streaming ? lastTurnKey : null,
+			// Untracked like the terminal check: read once at the streaming flip,
+			// never per token. A park resuming (wait elapsed, question answered)
+			// re-enters streaming on a message that already carries work — a
+			// continuation, not a new reply, so the carry-to-anchor must not
+			// re-run. A fresh reply's message is still empty at the flip.
+			resumedStream: Boolean(
+				streaming &&
+				lastMessage &&
+				untrack(() => lastMessage.content.length > 0 || (lastMessage.updates?.length ?? 0) > 0)
+			),
 		});
 	});
 
-	// Conversation switch also resets the artifact panel. This used to
+	// Conversation switch swaps the side pane to the destination's own state.
+	// This used to
 	// piggyback on a first-message-id heuristic that misfired when the first
 	// message was edited; the route param is the real signal.
-	let prevConversationKey = page.params?.id;
+	// The store keeps which conversation its state belongs to, since this view
+	// is mounted anew on the way through the new-chat page.
 	$effect(() => {
 		const key = page.params?.id;
-		if (key !== prevConversationKey) {
-			prevConversationKey = key;
-			artifactPanel.reset();
-		}
+		untrack(() => sidePane.enterConversation(key));
 	});
 
 	// The growing content element mounts after the container when a
@@ -373,11 +518,55 @@
 		chatScroll.setComposerHeight(composerHeight);
 	});
 
-	// Follow behavior tracks generation state: glide while a reply streams,
-	// snap while idle — a conversation switch must land at the bottom with no
-	// animated scrolling while its async content (markdown, images) settles.
+	// Open the newest dashboard the first time it shows up: the point of the run
+	// is watching it train. Once per URL, so the user can close it and read the
+	// chat while the run continues.
+	//
+	// Declared after the conversation-switch effect for the same reason the shared
+	// artifact open below is: a conversation -> conversation navigation can deliver
+	// the new messages and the new route param in one flush, and effects run in
+	// declaration order. Above the reset, this would open the destination's
+	// dashboard and record its key, then reset() would close the pane and clear
+	// that key -- and nothing would re-run this, so the dashboard would never open.
+	//
+	// Gated like the other two auto-opens rather than firing on presence. `loading`
+	// is what makes this "a run is happening now": without it, every hard load of
+	// any conversation that ever trained something re-opens the pane, because
+	// reset() clears the once-per-URL keys on each switch — framing a Space that
+	// went to sleep months ago. Desktop-only for the reason the shared-artifact
+	// open below is: on mobile the pane is a fullscreen overlay, and a shared
+	// conversation carries its tool results verbatim, so every viewer on a phone
+	// would arrive with the chat covered.
 	$effect(() => {
-		chatScroll.setStreaming(loading);
+		const latest = trackioDashboards.at(-1);
+		if (!latest || !loading) return;
+		// A dashboard named before it exists (create_trackio) is not framable until
+		// the run reaches trackio.init; opening it early frames a 404.
+		if (latest.spaceId && trackioStatus.status(latest.url) !== "live") return;
+		if (!window.matchMedia("(min-width: 768px)").matches) return;
+		sidePane.maybeAutoOpenTrackio(latest.url, latest.label);
+	});
+
+	$effect(() => {
+		const latest = workflowSpaces.at(-1);
+		if (!latest || !loading) return;
+		// Desktop only, and never over another view: with another one showing, it
+		// opens as a background tab.
+		if (!window.matchMedia("(min-width: 768px)").matches) return;
+		untrack(() => sidePane.maybeAutoOpenWorkflow(latest));
+	});
+
+	// A paper the agent opens in the answer being written comes up beside the
+	// chat, once: closing its tab sticks. Only that answer's papers count, so
+	// sending anything after a reload does not reopen an older one. Desktop
+	// only, like the dashboards above.
+	$effect(() => {
+		if (!loading) return;
+		const streaming = messages.at(-1);
+		const latest = streaming ? collectPapers([streaming]).at(-1) : undefined;
+		if (!latest) return;
+		if (!window.matchMedia("(min-width: 768px)").matches) return;
+		untrack(() => sidePane.maybeAutoOpenPaper(latest.id, latest.title));
 	});
 
 	// Shared conversations containing artifacts usually exist to show one off:
@@ -392,7 +581,7 @@
 		if (!latest) return;
 		autoOpenedSharedArtifact = true;
 		if (!window.matchMedia("(min-width: 768px)").matches) return;
-		artifactPanel.openArtifact(latest.identifier, null);
+		sidePane.openArtifact(latest.identifier, null);
 	});
 
 	const settings = useSettingsStore();
@@ -409,10 +598,8 @@
 	);
 
 	// Get provider override for the current model (HuggingChat only)
-	let providerOverride = $derived($settings.providerOverrides?.[currentModel.id]);
-	let hasProviderOverride = $derived(
-		providerOverride && providerOverride !== "auto" && !currentModel.isRouter
-	);
+	let providerOverride = $derived(shownProvider(currentModel, $settings.providerOverrides));
+	let hasProviderOverride = $derived(providerOverride !== undefined);
 
 	// Always allow common text-like files; add images only when model is multimodal
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
@@ -429,11 +616,259 @@
 	);
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
 	let focused = $state(false);
+	let composerForm = $state<HTMLFormElement>();
+	// Until the composer has had focus, its selection says nothing about where
+	// the user wants a chip, so one goes at the end of the draft instead.
+	let composerUsed = false;
+	$effect(() => {
+		if (focused) composerUsed = true;
+	});
+
+	// --- ML Assistant mode (build flag, see $lib/utils/mlAssistantFlag) --------
+
+	let mlModeOn = $derived(ML_ASSISTANT_MODE && mlAssistant.enabled);
+	let mlTaskRunning = $derived(ML_ASSISTANT_MODE && mlAssistant.taskStarted);
+
+	// a message sent during a question still goes the usual way
+	let turnWaiting = $derived(turnStateOf(messages.at(-1))?.state === "waiting");
+	// a normal send could race the turn the server starts from the queue
+	let queueing = $derived(
+		mlTaskRunning &&
+			!shared &&
+			!isReadOnly &&
+			(loading || turnWaiting || queuedInputs.items.length > 0)
+	);
+
+	function queueDraft() {
+		if (files.length > 0) {
+			$error = "Attachments can be sent once ML Intern finishes this turn.";
+			return;
+		}
+		const text = draft.trim();
+		draft = "";
+		tap();
+		void queuedInputs.enqueue(text).then((outcome) => {
+			if (outcome !== "failed") return;
+			draft = draft ? `${text}\n\n${draft}` : text;
+			$error = "Could not queue the message. Try again.";
+		});
+	}
+
+	async function editQueued(id: string) {
+		const item = queuedInputs.items.find((queued) => queued.id === id);
+		if (!item) return;
+		const outcome = await queuedInputs.remove(id);
+		if (outcome === "cancelled") draft = draft ? `${item.text}\n\n${draft}` : item.text;
+		else if (outcome === "error") $error = "Could not edit the queued message. Try again.";
+	}
+
+	async function sendQueuedNow() {
+		if (!(await queuedInputs.sendNow())) {
+			$error = "Could not send the queued messages now. Try again.";
+		}
+	}
+
+	async function removeQueued(id: string) {
+		if ((await queuedInputs.remove(id)) === "error") {
+			$error = "Could not remove the queued message. Try again.";
+		}
+	}
+
+	$effect(() => {
+		const conversationId = page.params?.id;
+		if (!mlTaskRunning || shared || !conversationId) {
+			queuedInputs.reset();
+			return;
+		}
+		return queuedInputs.watch(conversationId, {
+			busy: loading || turnWaiting,
+			onStarted: () => onqueuedturn?.(),
+		});
+	});
+
+	$effect(() => {
+		if (queuedInputs.returned.length === 0) return;
+		untrack(() => {
+			const returned = queuedInputs.takeReturned();
+			draft = [...returned.map((input) => input.text), draft].filter(Boolean).join("\n\n");
+			const reason = returned.find((input) => input.error)?.error;
+			if (reason) $error = reason;
+		});
+	});
+
+	$effect(() => {
+		const delivered = new Set<string>();
+		for (const update of messages.at(-1)?.updates ?? []) {
+			if (update.type !== MessageUpdateType.QueuedInput) continue;
+			for (const input of update.inputs) delivered.add(input.id);
+		}
+		untrack(() => queuedInputs.delivered(delivered));
+	});
+	// Resume beats Retry for a failed agentic turn: retry re-runs the whole turn
+	// (duplicating jobs and repos already created), resume continues past the
+	// preserved transcript. ML mode only — elsewhere turns rarely carry work
+	// worth saving — and only when the turn did something (see the util).
+	let canResumeTurn = $derived(
+		mlModeOn && !loading && lastIsError && !!lastMessage && canResumeAfterFailure(lastMessage)
+	);
+	function sendResumeMessage() {
+		if (!lastMessage) return;
+		sendFixRequest(buildResumeMessage(failureDetailOf(lastMessage)));
+	}
+	// The strip is a task status bar only: it slides in on the send that starts an
+	// ML task and stays for the rest of the conversation. Before that the mode
+	// lives in the composer pill, and a chat started without the mode never shows
+	// either surface.
+	let mlStripVisible = $derived(ML_ASSISTANT_MODE && mlTaskRunning);
+
+	// The pill is the mode's pre-task switch. Empty conversations only — the mode
+	// cannot be joined once a chat has started without it.
+	// With no set configured the send would fail; no switch is better than a
+	// dead end.
+	let mlModelSet = $derived(
+		ML_ASSISTANT_MODE
+			? ((page.data as { mlAssistantModels?: string[] }).mlAssistantModels ?? [])
+			: []
+	);
+	let mlPillVisible = $derived(
+		ML_ASSISTANT_MODE &&
+			!shared &&
+			!isReadOnly &&
+			!mlTaskRunning &&
+			messages.length === 0 &&
+			mlModelSet.length > 0
+	);
+
+	// ML Intern launch card under the home-screen logo (HuggingChat only). Temporary,
+	// so its dismissal lives in localStorage rather than in a settings field. Off on
+	// short viewports, and while the recorder replaces the composer: the pill (and
+	// with it the first-run onboarding its CTA relies on) is unmounted then.
+	const convsStore = useConversationsStore();
+	const shortViewport = new MediaQuery("(max-height: 560px)");
+	const ML_SPOTLIGHT_KEY = "mlInternSpotlightDismissed";
+	// Hidden until the browser has been asked, so SSR and hydration agree.
+	let mlSpotlightDismissed = $state(true);
+	$effect(() => {
+		mlSpotlightDismissed = localStorage.getItem(ML_SPOTLIGHT_KEY) === "1";
+	});
+	let mlSpotlightVisible = $derived(
+		publicConfig.isHuggingChat &&
+			mlPillVisible &&
+			page.route.id === "/" &&
+			!mlAssistant.enabled &&
+			!mlSpotlightDismissed &&
+			!shortViewport.current &&
+			!isRecording &&
+			!isTranscribing &&
+			!convsStore.list.some((conv) => conv.mlAssistant)
+	);
+
+	function dismissMlSpotlight() {
+		mlSpotlightDismissed = true;
+		localStorage.setItem(ML_SPOTLIGHT_KEY, "1");
+	}
+
+	/** The card's CTA: switches the mode on, as the pill would, and retires the card. */
+	function tryMlIntern() {
+		if (requireAuthUser()) return;
+		mlAssistant.toggle(true);
+		dismissMlSpotlight();
+	}
+	// A mode conversation whose model left the set can only move within the set.
+	let switchableModels = $derived(
+		mlTaskRunning ? models.filter((m) => mlModelSet.includes(m.id)) : models
+	);
+
+	$effect(() => {
+		if (!ML_ASSISTANT_MODE) return;
+		const conversationId = page.params?.id;
+		const {
+			mlAssistant: startedInMlMode,
+			plan,
+			mlBudget,
+		} = page.data as {
+			mlAssistant?: boolean;
+			plan?: PlanState;
+			mlBudget?: MlBudget;
+		};
+		untrack(() => {
+			const reset = mlAssistant.syncConversation(conversationId, Boolean(startedInMlMode));
+			// A reopened mode conversation renders mid-plan from the stored snapshot, and
+			// so does a reload: a turn started elsewhere (Slack, another tab) streams its
+			// plan to no one here, and the resubscribe starts past it. A snapshot without
+			// a plan keeps the strip on its tool note.
+			if (startedInMlMode && plan?.steps.length) {
+				mlAssistant.setPlan(planStepsToMlSteps(plan.steps), plan.version);
+			}
+			// Loaded state seeds the ledger; the stream's Budget updates take over
+			// from there. The empty-ledger condition covers adoption — the create
+			// flow lands here with reset=false — while still refusing to let a
+			// stale invalidation roll back what the stream already reported. A mode
+			// conversation without a stored budget renders as $0.00: the gate treats
+			// it that way, and the readout must say what the gate will do.
+			if (startedInMlMode && (reset || mlAssistant.budget === undefined)) {
+				mlAssistant.setBudget({
+					totalMicroUsd: mlBudget?.totalMicroUsd ?? 0,
+					spentMicroUsd: mlBudget?.spentMicroUsd ?? 0,
+					reservedMicroUsd: mlBudget ? reservedMicroUsd(mlBudget) : 0,
+				});
+			}
+		});
+	});
+
+	// read from the registry, not derived from the messages, a stage changes between turns
+	// loading is the live signal, so a turn ending reruns this and the store refetches once
+	$effect(() => {
+		const conversationId = page.params?.id;
+		if (!mlTaskRunning || shared || !conversationId) {
+			// nothing to watch here, a remount on another route must not keep the last rows
+			mlRegistry.reset();
+			return;
+		}
+		return mlRegistry.watch(conversationId, { live: loading });
+	});
+
+	$effect(() => {
+		const conversationId = ML_ASSISTANT_MODE && !shared ? page.params?.id : undefined;
+		untrack(() => mlReviews.bind(conversationId));
+	});
+
+	$effect(() => {
+		if (!loading) untrack(() => mlReviews.refreshOpen());
+	});
+
+	const budgetClient = useAPIClient();
+
+	/**
+	 * Commits a new amount left. The server turns it into a total against the
+	 * live ledger; the strip shows the expected figure at once, takes the
+	 * server's ledger when it answers, and rolls back if the server said no.
+	 */
+	function changeMlBudget(leftUsd: number) {
+		const conversationId = page.params?.id;
+		const previous = mlAssistant.budget;
+		if (!conversationId || !previous) return;
+		mlAssistant.setBudget({
+			...previous,
+			totalMicroUsd: usdToMicroUsd(leftUsd) + previous.spentMicroUsd + previous.reservedMicroUsd,
+		});
+		budgetClient
+			.conversations({ id: conversationId })
+			.patch({ mlBudgetLeftUsd: leftUsd })
+			.then(handleResponse)
+			.then((res: { mlBudget?: MlBudgetSnapshot } | null) => {
+				if (res?.mlBudget) mlAssistant.setBudget(res.mlBudget);
+			})
+			.catch(() => {
+				mlAssistant.setBudget(previous);
+			});
+	}
 
 	let activeRouterExamplePrompt = $state<string | null>(null);
-	// Use MCP examples when all base servers are enabled, otherwise use router examples
+	// ML Assistant mode brings its own chip set; otherwise use MCP examples when all
+	// base servers are enabled, and router examples when they are not.
 	let activeExamples = $derived<RouterExample[]>(
-		$allBaseServersEnabled ? mcpExamples : routerExamples
+		mlModeOn ? mlAssistantExamples : $allBaseServersEnabled ? mcpExamples : routerExamples
 	);
 	let routerFollowUps = $derived<RouterFollowUp[]>(
 		activeRouterExamplePrompt
@@ -486,8 +921,81 @@
 			const currentDraft = untrack(() => draft);
 			draft = currentDraft.trim() ? `${currentDraft}\n\n${pending.text}` : pending.text;
 		}
+		for (const view of pending.dashboardViews ?? []) insertViewToken(view);
+		for (const quote of pending.paperQuotes ?? []) insertQuoteToken(quote);
 		pendingComposerPayload.set(undefined);
 	});
+
+	// Every view this composer has held stays known, so undoing a deleted chip
+	// brings its view back.
+	const knownViews = new Map<string, TrackioDashboardView>();
+	$effect(() => {
+		const text = draft;
+		untrack(() => {
+			for (const view of dashboardViews) knownViews.set(trackioViewToken(view), view);
+			const next = viewsInText(text, knownViews.values());
+			const same =
+				next.length === dashboardViews.length && next.every((v, i) => v === dashboardViews[i]);
+			if (!same) dashboardViews = next;
+		});
+	});
+
+	// Same for paper quotes: a deleted chip's quote comes back with an undo.
+	const knownQuotes = new Map<string, PaperQuote>();
+	$effect(() => {
+		const text = draft;
+		untrack(() => {
+			for (const quote of paperQuotes) knownQuotes.set(paperQuoteToken(quote), quote);
+			const next = quotesInText(text, knownQuotes.values());
+			const same = next.length === paperQuotes.length && next.every((q, i) => q === paperQuotes[i]);
+			if (!same) paperQuotes = next;
+		});
+	});
+
+	function insertViewToken(view: TrackioDashboardView) {
+		if (untrack(() => dashboardViews).length >= MAX_VIEWS_PER_MESSAGE) {
+			$error = `A message can carry at most ${MAX_VIEWS_PER_MESSAGE} dashboard views.`;
+			return;
+		}
+		const keyed = { ...view, key: newTrackioViewKey() };
+		const token = trackioViewToken(keyed);
+		knownViews.set(token, keyed);
+		insertToken(token);
+	}
+
+	function insertQuoteToken(quote: PaperQuote) {
+		if (untrack(() => paperQuotes).length >= MAX_QUOTES_PER_MESSAGE) {
+			$error = `A message can carry at most ${MAX_QUOTES_PER_MESSAGE} quotes.`;
+			return;
+		}
+		const keyed = { ...quote, key: newPaperQuoteKey() };
+		const token = paperQuoteToken(keyed);
+		knownQuotes.set(token, keyed);
+		insertToken(token);
+	}
+
+	// Through the editing stack where it can, so the insert is one Cmd+Z away.
+	function insertToken(token: string) {
+		const textarea = composerForm?.querySelector("textarea");
+		const current = untrack(() => draft);
+		const start = textarea && composerUsed ? textarea.selectionStart : current.length;
+		const end = textarea && composerUsed ? textarea.selectionEnd : current.length;
+		const before = current.slice(0, start);
+		const after = current.slice(end);
+		const insert = `${before && !/\s$/.test(before) ? " " : ""}${token}${/^\s/.test(after) ? "" : " "}`;
+		const caret = start + insert.length;
+		if (textarea && !isVirtualKeyboard()) {
+			textarea.focus({ preventScroll: true });
+			textarea.setSelectionRange(start, end);
+			if (document.execCommand("insertText", false, insert)) return;
+		}
+		draft = before + insert + after;
+		void tick().then(() => {
+			if (!textarea || isVirtualKeyboard()) return;
+			textarea.focus({ preventScroll: true });
+			textarea.setSelectionRange(caret, caret);
+		});
+	}
 
 	function triggerPrompt(prompt: string) {
 		if (requireAuthUser() || loading) return;
@@ -497,6 +1005,15 @@
 
 	async function startExample(example: RouterExample) {
 		if (requireAuthUser()) return;
+
+		// ML Intern chips seed the composer instead of dispatching. Their prompts
+		// are complete, but they name one specific paper, model or dataset, and a
+		// task at this price is one the user should read before it starts.
+		if (mlModeOn) {
+			draft = example.prompt;
+			return;
+		}
+
 		activeRouterExamplePrompt = example.prompt;
 
 		if (browser && example.attachments?.length) {
@@ -631,14 +1148,16 @@
 				<IconShare />
 			</button>
 		{/if}
-		{#if featureAnnouncement && showFeatureAnnouncement}
+		{#if featureAnnouncement && showFeatureAnnouncement && !mlSpotlightVisible}
 			<FeatureAnnouncementToast announcement={featureAnnouncement} />
 		{/if}
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<!-- tabindex: the document never scrolls in this app, so without it
-		     keyboard-only users cannot scroll the conversation at all. -->
+		     keyboard-only users cannot scroll the conversation at all. Keyboard
+		     focus draws a soft inset ring instead of the browser's default
+		     outline around the whole pane; mouse focus draws nothing. -->
 		<div
-			class="scrollbar-custom h-full [scrollbar-gutter:stable_both-edges] overflow-y-auto overscroll-contain"
+			class="scrollbar-custom h-full [scrollbar-gutter:stable_both-edges] overflow-y-auto overscroll-contain focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-500/60 dark:focus-visible:outline-blue-400/60"
 			tabindex="0"
 			aria-label="Conversation messages"
 			use:chatScroll.attach={{
@@ -656,57 +1175,71 @@
 				{/if}
 
 				{#if messages.length > 0}
-					<div bind:this={messagesEl} class="flex h-max flex-col gap-8">
-						{#each messages as message, idx (message.id)}
-							<ChatMessage
-								{loading}
-								{message}
-								alternatives={messagesAlternatives.find((a) => a.includes(message.id)) ?? []}
-								isAuthor={!shared}
-								readOnly={isReadOnly}
-								isLast={idx === messages.length - 1}
-								bind:editMsdgId
-								onretry={(payload) => {
-									// Edit-with-content mounts a fresh pair like a send and
-									// anchors it; a plain regenerate must never yank a user
-									// who triggered it from a scrolled-up position.
-									if (payload.content !== undefined) chatScroll.armSend();
-									else chatScroll.armRetry();
-									onretry?.(payload);
-								}}
-								onshowAlternateMsg={(payload) => {
-									chatScroll.notifyBranchSwitch();
-									onshowAlternateMsg?.(payload);
-								}}
-							/>
+					<!-- padding-bottom is the composer clearance (content never hides
+					     behind the composer overlay); the SSR-rendered value equals the
+					     historical clearance. The anchored turn's min-height is the
+					     reservation its reply streams into — space the turn owns from
+					     the start, so filling it moves nothing. -->
+					<div
+						bind:this={messagesEl}
+						class="flex h-max flex-col gap-8"
+						style:padding-bottom="{chatScroll.bottomClearancePx}px"
+					>
+						<!-- Turn groups are identified by position, not key: the post-stream
+						     reconciliation re-keys every message, and re-created group
+						     elements would give Safari an in-between layout to clamp the
+						     view against (it clamps synchronously mid-DOM-swap). Messages
+						     inside stay keyed by id; the group's reservation binds to the
+						     anchored INDEX for the same reason. -->
+						{#each turns as turn, turnIdx}
+							<div
+								class="flex flex-col gap-8"
+								style:min-height={turnIdx === chatScroll.anchoredTurnIndex
+									? `${chatScroll.anchorMinHeightPx}px`
+									: null}
+							>
+								{#each turn.messages as message, msgIdx (message.id)}
+									<ChatMessage
+										{loading}
+										{message}
+										alternatives={messagesAlternatives.find((a) => a.includes(message.id)) ?? []}
+										isAuthor={!shared}
+										readOnly={isReadOnly}
+										slackManaged={!!slackThreadUrl}
+										isLast={turnIdx === turns.length - 1 && msgIdx === turn.messages.length - 1}
+										bind:editMsdgId
+										onretry={(payload) => {
+											// Edit-with-content mounts a fresh turn like a send; a
+											// plain regenerate needs nothing — the reservation
+											// absorbs the old reply's collapse either way.
+											if (payload.content !== undefined) chatScroll.notifySend();
+											onretry?.(payload);
+										}}
+										onshowAlternateMsg={(payload) => {
+											chatScroll.notifyBranchSwitch();
+											onshowAlternateMsg?.(payload);
+										}}
+									/>
+								{/each}
+								{#if turnIdx === turns.length - 1 && showPendingPlaceholder}
+									<ChatMessage
+										loading={true}
+										message={{
+											id: "pending-placeholder",
+											content: "",
+											from: "assistant",
+											children: [],
+										}}
+										isAuthor={!shared}
+										readOnly={isReadOnly}
+									/>
+								{/if}
+							</div>
 						{/each}
-						{#if showPendingPlaceholder}
-							<ChatMessage
-								loading={true}
-								message={{
-									id: "pending-placeholder",
-									content: "",
-									from: "assistant",
-									children: [],
-								}}
-								isAuthor={!shared}
-								readOnly={isReadOnly}
-							/>
-						{/if}
-						{#if isReadOnly}
-							<ModelSwitch {models} {currentModel} />
+						{#if isReadOnly && !slackThreadUrl}
+							<ModelSwitch models={switchableModels} {currentModel} />
 						{/if}
 					</div>
-					<!-- Send-anchor spacer: inflated at send so the sent message lands near
-					     the viewport top, shrinking 1:1 as the reply grows (constant
-					     scrollHeight = zero motion), floored at composer clearance.
-					     chatScroll owns the height after hydration; the template value
-					     provides the composer clearance in server-rendered markup. -->
-					<div
-						use:chatScroll.attachSpacer
-						class="flex-shrink-0"
-						style="height: {MIN_SPACER_FALLBACK_PX}px"
-					></div>
 				{:else if pending}
 					<!-- Outside messagesEl, so it gets its own wrapper for the scroll
 					     controller's size observer (an h-full column never resizes). -->
@@ -729,7 +1262,11 @@
 						onmessage={(content) => {
 							onmessage?.(content);
 						}}
-					/>
+					>
+						{#if mlSpotlightVisible}
+							<MlInternSpotlight ontry={tryMlIntern} ondismiss={dismissMlSpotlight} />
+						{/if}
+					</ChatIntroduction>
 				{/if}
 			</div>
 
@@ -757,13 +1294,18 @@
 			max-sm:py-0 sm:px-[calc(1.25rem+var(--scrollbar-gutter,0px))]
 			md:pb-4 xl:max-w-4xl dark:border-gray-800 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0"
 		>
-			{#if !draft.length && !messages.length && !sources.length && !loading && (currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
+			{#if !draft.length && !messages.length && !sources.length && !loading && (mlModeOn || currentModel.isRouter || (modelSupportsTools && $allBaseServersEnabled)) && activeExamples.length && !hideRouterExamples && !lastIsError && $mcpServersLoaded}
 				<div
 					class="mb-3 no-scrollbar flex w-full justify-start gap-2 overflow-x-auto whitespace-nowrap text-gray-400 select-none dark:text-gray-500"
 				>
 					{#each activeExamples as ex}
 						<button
-							class="flex items-center gap-1 rounded-lg bg-gray-100/90 px-2 py-0.5 text-center text-sm backdrop-blur-sm hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400"
+							class={[
+								"flex items-center gap-1 rounded-lg px-2 py-0.5 text-center text-sm backdrop-blur-sm",
+								mlModeOn
+									? "bg-[#fff1e4] text-[#c2410c] dark:bg-[#3a2410] dark:text-[#fdba74]"
+									: "bg-gray-100/90 hover:text-gray-500 dark:bg-gray-700/50 dark:hover:text-gray-400",
+							]}
 							onclick={() => startExample(ex)}
 						>
 							{ex.title}
@@ -809,109 +1351,207 @@
 			{/if}
 
 			<div class="w-full">
-				<div class="flex w-full *:mb-3">
-					{#if !loading && lastIsError}
-						<RetryBtn
-							classNames="ml-auto"
-							onClick={() => {
-								if (lastMessage && lastMessage.ancestors) {
-									chatScroll.armRetry();
-									onretry?.({
-										id: lastMessage.id,
-									});
-								}
-							}}
+				{#if slackThreadUrl}
+					{#if ML_ASSISTANT_MODE}
+						<MlAssistantStrip
+							visible={mlStripVisible}
+							steps={mlAssistant.steps}
+							statusLabel={mlAssistant.statusLabel}
+							complete={mlAssistant.complete}
+							budget={mlAssistant.budget}
+							dashboard={trackioDashboards.at(-1)}
+							workflow={workflowSpaces.at(-1)}
+							{papers}
+							registry={mlRegistry.summary}
 						/>
 					{/if}
-				</div>
-				<form
-					tabindex="-1"
-					aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
-					onsubmit={(e) => {
-						e.preventDefault();
-						handleSubmit();
-					}}
-					class={{
-						"relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 dark:border-gray-700 dark:bg-gray-800": true,
-						"opacity-30": isReadOnly,
-						"max-sm:mb-4": focused && isVirtualKeyboard(),
-					}}
-				>
-					{#if isRecording || isTranscribing}
-						<VoiceRecorder
-							{isTranscribing}
-							{isTouchDevice}
-							oncancel={() => {
-								isRecording = false;
-							}}
-							onconfirm={handleRecordingConfirm}
-							onsend={handleRecordingSend}
-							onerror={handleRecordingError}
-						/>
-					{:else if onDrag && isFileUploadEnabled}
-						<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
-					{:else}
-						<div
-							class="flex w-full flex-1 rounded-xl border-none bg-transparent"
-							class:paste-glow={pastedLongContent}
+					<div
+						class="rounded-xl border bg-gray-100 p-4 text-sm dark:border-gray-700 dark:bg-gray-800"
+					>
+						<p>This session is managed in Slack. This view is read-only.</p>
+						<a class="font-medium underline" href={slackThreadUrl} target="_blank" rel="noreferrer"
+							>Continue in Slack</a
 						>
-							{#if lastIsError}
-								<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
-							{:else}
-								<ChatInput
-									placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
-									{loading}
-									bind:value={draft}
-									bind:files
-									mimeTypes={activeMimeTypes}
-									onsubmit={handleSubmit}
-									{onPaste}
-									disabled={isReadOnly || lastIsError}
-									{modelIsMultimodal}
-									{modelSupportsTools}
-									bind:focused
-								/>
+					</div>
+				{:else}
+					{#if askQuestion}
+						<!-- Keyed: the next waiting question must not inherit this one's step and picks. -->
+						{#key askQuestion.request.elicitationId}
+							<AskQuestion
+								conversationId={askQuestion.conversationId}
+								request={askQuestion.request}
+							/>
+						{/key}
+					{/if}
+					<div class="flex w-full gap-2 *:mb-3">
+						{#if !loading && lastIsError}
+							{#if canResumeTurn}
+								<ResumeBtn classNames="ml-auto" onClick={sendResumeMessage} />
 							{/if}
-
-							{#if loading}
-								<StopGeneratingBtn
-									onClick={() => {
-										hapticError();
-										onstop?.();
+							<RetryBtn
+								classNames={canResumeTurn ? "" : "ml-auto"}
+								onClick={() => {
+									if (lastMessage && lastMessage.ancestors) {
+										onretry?.({
+											id: lastMessage.id,
+										});
+									}
+								}}
+							/>
+						{/if}
+					</div>
+					{#if mlTaskRunning}
+						<QueuedInputs
+							items={queuedInputs.items}
+							busy={loading || turnWaiting}
+							slackManaged={!!slackThreadUrl}
+							onremove={removeQueued}
+							onedit={editQueued}
+							onsendnow={sendQueuedNow}
+						/>
+					{/if}
+					{#if mlTaskRunning && !shared && page.params?.id}
+						{#key page.params.id}
+							<SideQuestionPanel bind:this={sideQuestionPanel} conversationId={page.params.id} />
+						{/key}
+					{/if}
+					<form
+						bind:this={composerForm}
+						tabindex="-1"
+						aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
+						onsubmit={(e) => {
+							e.preventDefault();
+							handleSubmit();
+						}}
+						class={{
+							"relative flex w-full max-w-4xl flex-1 flex-col rounded-xl border bg-gray-100 dark:bg-gray-800": true,
+							"transition-[border-color] duration-[350ms] ease-[ease]": ML_ASSISTANT_MODE,
+							"border-[#efc9ad] dark:border-[#5a3a22]": mlModeOn,
+							"dark:border-gray-700": !mlModeOn,
+							"opacity-30": isReadOnly,
+							"max-sm:mb-4": focused && isVirtualKeyboard(),
+						}}
+						style:--composer-actions-width={(transcriptionEnabled && !loading) ||
+						(loading && queueing && draft.trim() && !draftIsSideQuestion)
+							? "84px"
+							: "44px"}
+					>
+						{#if ML_ASSISTANT_MODE}
+							<MlAssistantStrip
+								visible={mlStripVisible}
+								steps={mlAssistant.steps}
+								statusLabel={mlAssistant.statusLabel}
+								complete={mlAssistant.complete}
+								budget={mlAssistant.budget}
+								onbudgetchange={page.params?.id ? changeMlBudget : undefined}
+								dashboard={trackioDashboards.at(-1)}
+								workflow={workflowSpaces.at(-1)}
+								{papers}
+								registry={mlRegistry.summary}
+							/>
+						{/if}
+						<!-- The composer box is a column so the ML Assistant strip can stack on
+					     top; this row is the composer proper and keeps its own layout. -->
+						<div class="flex w-full items-center">
+							{#if isRecording || isTranscribing}
+								<VoiceRecorder
+									{isTranscribing}
+									{isTouchDevice}
+									oncancel={() => {
+										isRecording = false;
 									}}
-									showBorder={true}
-									classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow-sm transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
+									onconfirm={handleRecordingConfirm}
+									onsend={handleRecordingSend}
+									onerror={handleRecordingError}
 								/>
+							{:else if onDrag && isFileUploadEnabled}
+								<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 							{:else}
-								{#if transcriptionEnabled}
-									<button
-										type="button"
-										class="absolute right-10 bottom-2 mr-1.5 btn size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 sm:right-9 sm:size-7 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white"
-										disabled={isReadOnly}
-										onclick={() => {
-											isRecording = true;
-										}}
-										aria-label="Start voice recording"
-									>
-										<IconMic class="size-4" />
-									</button>
-								{/if}
-								<button
-									class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
-									isReadOnly
-										? ''
-										: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
-									disabled={!draft || isReadOnly}
-									type="submit"
-									aria-label="Send message"
-									name="submit"
+								<div
+									class="flex w-full flex-1 rounded-xl border-none bg-transparent"
+									class:paste-glow={pastedLongContent}
 								>
-									<IconArrowUp />
-								</button>
+									{#if lastIsError}
+										<ChatInput
+											value="Sorry, something went wrong. Please try again."
+											disabled={true}
+										/>
+									{:else}
+										<ChatInput
+											placeholder={isReadOnly
+												? "This conversation is read-only."
+												: queueing
+													? "Add to the run, read at its next step"
+													: mlModeOn
+														? ML_ASSISTANT_PLACEHOLDER
+														: "Ask anything"}
+											{loading}
+											bind:value={draft}
+											bind:files
+											mimeTypes={activeMimeTypes}
+											onsubmit={handleSubmit}
+											{onPaste}
+											disabled={isReadOnly || lastIsError}
+											{modelIsMultimodal}
+											{modelSupportsTools}
+											showMlPill={mlPillVisible}
+											slashCommands={sideQuestionPanel ? [BTW_COMMAND] : []}
+											bind:focused
+										/>
+									{/if}
+
+									{#if loading && queueing && draft.trim() && !draftIsSideQuestion}
+										<button
+											class="absolute right-11 bottom-2 btn size-8 self-end rounded-full border bg-black! text-white! shadow transition-none sm:right-10 sm:size-7 dark:border-transparent dark:bg-white! dark:text-black!"
+											type="submit"
+											aria-label="Queue message"
+											title="Queue: read at the next step"
+											name="submit"
+										>
+											<IconArrowUp />
+										</button>
+									{/if}
+									{#if loading && !draftIsSideQuestion}
+										<StopGeneratingBtn
+											onClick={() => {
+												hapticError();
+												onstop?.();
+											}}
+											showBorder={true}
+											classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow-sm transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
+										/>
+									{:else}
+										{#if transcriptionEnabled}
+											<button
+												type="button"
+												class="absolute right-10 bottom-2 mr-1.5 btn size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 sm:right-9 sm:size-7 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white"
+												disabled={isReadOnly}
+												onclick={() => {
+													isRecording = true;
+												}}
+												aria-label="Start voice recording"
+											>
+												<IconMic class="size-4" />
+											</button>
+										{/if}
+										<button
+											class="absolute right-2 bottom-2 btn size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner sm:size-7 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black {!draft ||
+											isReadOnly
+												? ''
+												: 'bg-black! text-white! dark:bg-white! dark:text-black!'}"
+											disabled={!draft || isReadOnly}
+											type="submit"
+											aria-label="Send message"
+											name="submit"
+										>
+											<IconArrowUp />
+										</button>
+									{/if}
+								</div>
 							{/if}
 						</div>
-					{/if}
-				</form>
+					</form>
+				{/if}
 				<div
 					class={{
 						"mt-1.5 flex h-5 items-center self-stretch px-0.5 text-xs whitespace-nowrap text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
@@ -1015,7 +1655,10 @@
 					{/if}
 					{#if $settings.reasoningOverrides?.[currentModel.id] ?? currentModel.supportsReasoning}
 						<div class="ml-auto">
-							<ThinkingEffortChip modelId={currentModel.id} />
+							<ThinkingEffortChip
+								modelId={currentModel.id}
+								presetEffort={mlModeOn ? ML_ASSISTANT_EFFORT : undefined}
+							/>
 						</div>
 					{/if}
 				</div>
@@ -1023,12 +1666,23 @@
 		</div>
 	</div>
 
-	<ArtifactPanel
-		registry={artifactRegistry}
-		{loading}
-		canScreenshot={!shared && !isReadOnly && mimeMatchesAllowlist("image/png", activeMimeTypes)}
-		onsend={canSendFix ? sendFixRequest : undefined}
-	/>
+	<SidePaneHost items={paneItems} {papers} canQuote={!shared && !isReadOnly}>
+		{#snippet views(resizing)}
+			<ArtifactPanel
+				registry={artifactRegistry}
+				{loading}
+				{resizing}
+				canScreenshot={!shared && !isReadOnly && mimeMatchesAllowlist("image/png", activeMimeTypes)}
+				onsend={canSendFix ? sendFixRequest : undefined}
+			/>
+			{#if ML_ASSISTANT_MODE}
+				<MlRegistryPane />
+				{#if !shared}
+					<MlReviewPane />
+				{/if}
+			{/if}
+		{/snippet}
+	</SidePaneHost>
 </div>
 
 <style>

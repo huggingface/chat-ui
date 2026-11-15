@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { loginInNewTab } from "$lib/utils/auth";
 	import Modal from "$lib/components/Modal.svelte";
 	import IconOmni from "$lib/components/icons/IconOmni.svelte";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+	import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 
 	const publicConfig = usePublicConfig();
 
@@ -30,6 +32,14 @@
 				<Logo classNames="mr-2 size-12 dark:invert" />
 				{publicConfig.PUBLIC_APP_NAME}
 			</h2> -->
+			{#if ML_ASSISTANT_MODE && publicConfig.isHuggingChat}
+				<!-- Launch label, in the corner the "Now with MCP!" badge used to take. -->
+				<div
+					class="absolute right-3 bottom-3 rounded-lg border border-[#ea580c]/30 bg-[#ea580c]/20 px-2 py-0.5 text-sm font-semibold text-[#fdba74]"
+				>
+					Now with ML Intern!
+				</div>
+			{/if}
 		</div>
 
 		<div class="text-gray-700 dark:text-gray-200">
@@ -45,6 +55,10 @@
 			</p>
 		</div>
 
+		{#if $loginInNewTab}<p class="text-sm">
+				Continue signing in in the new tab. If you return here after signing in, reload this page.
+				If your browser blocks embedded cookies, use the app in the new tab.
+			</p>{/if}
 		<button
 			class="k w-full rounded-xl bg-black px-5 py-2.5 text-base font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
 			onclick={close}

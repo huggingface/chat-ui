@@ -12,8 +12,11 @@ on:
         description: "Slugified value"
         value: ${{ jobs.generate-slug.outputs.slug }}
 
+permissions: {}
+
 jobs:
   generate-slug:
+    permissions: {}
     runs-on: ubuntu-latest
     outputs:
       slug: ${{ steps.slugify.outputs.slug }}

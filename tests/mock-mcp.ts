@@ -8,9 +8,9 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { pathToFileURL } from "node:url";
-import { z } from "zod";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
+// Raw JSON Schema, not zod: the v2 packages carry their own zod 4 and the app is on zod 3.
+import { McpServer, fromJsonSchema } from "@modelcontextprotocol/server";
 
 export const MOCK_MCP_PORT = Number(process.env.MOCK_MCP_PORT ?? 8789);
 
@@ -45,7 +45,11 @@ function buildServer(record: (call: RecordedToolCall) => void): McpServer {
 		"echo",
 		{
 			description: "Echoes back the text it is given.",
-			inputSchema: { text: z.string().describe("Text to echo back") },
+			inputSchema: fromJsonSchema<{ text: string }>({
+				type: "object",
+				properties: { text: { type: "string", description: "Text to echo back" } },
+				required: ["text"],
+			}),
 		},
 		({ text }) => {
 			record({ name: "echo", args: { text }, at: Date.now() });
@@ -57,7 +61,11 @@ function buildServer(record: (call: RecordedToolCall) => void): McpServer {
 		"add",
 		{
 			description: "Adds two numbers and returns the sum.",
-			inputSchema: { a: z.number(), b: z.number() },
+			inputSchema: fromJsonSchema<{ a: number; b: number }>({
+				type: "object",
+				properties: { a: { type: "number" }, b: { type: "number" } },
+				required: ["a", "b"],
+			}),
 		},
 		({ a, b }) => {
 			record({ name: "add", args: { a, b }, at: Date.now() });
@@ -112,7 +120,7 @@ export async function startMockMcp(port: number = MOCK_MCP_PORT): Promise<MockMc
 		if (url.pathname === "/mcp") {
 			// Stateless: a fresh server + transport per request, torn down after.
 			const server = buildServer(record);
-			const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+			const transport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 			res.on("close", () => {
 				void transport.close();
 				void server.close();

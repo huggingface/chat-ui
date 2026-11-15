@@ -32,6 +32,7 @@ interface ConversationListItem {
 	title: string;
 	updatedAt: Date | string;
 	model?: string;
+	mlAssistant?: boolean;
 }
 
 class ConversationsStore {
@@ -86,6 +87,7 @@ class ConversationsStore {
 				title: conv.title.trim(),
 				model: conv.model ?? defaultModel,
 				updatedAt: new Date(conv.updatedAt),
+				mlAssistant: conv.mlAssistant ?? false,
 			}));
 			this.#list = freshList;
 		} catch (err) {

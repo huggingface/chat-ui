@@ -1,6 +1,18 @@
-import { describe, expect, it } from "vitest";
-import { prepareMessagesWithFiles } from "./prepareFiles";
+import { describe, expect, it, vi } from "vitest";
+import { ObjectId } from "mongodb";
+import { collections, ready } from "$lib/server/database";
+import type { Conversation } from "$lib/types/Conversation";
+import type { OpenAI } from "openai";
+import { prepareHistory, prepareMessagesWithFiles, type HistoryMessage } from "./prepareFiles";
+import {
+	historyCost,
+	omittedMarker,
+	planWindow,
+	renderWindow,
+	type HistoryUnit,
+} from "./historyWindow";
 import type { EndpointMessage } from "$lib/server/endpoints/endpoints";
+import { JOB_FAILED_NOTE, withJobFailedNote } from "../builtinTools/jobCheckPrompt";
 import type { makeImageProcessor } from "$lib/server/endpoints/images";
 import {
 	MessageToolUpdateType,
@@ -117,6 +129,32 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		}
 	});
 
+	it("replays a virtual-file call with the reference the model wrote, never the expanded content", async () => {
+		const raw = '{"operation":"uv","args":{"script":"v-file://train.py","flavor":"cpu-basic"}}';
+		const messages: EndpointMessage[] = [
+			{ from: "user", content: "train it" },
+			{
+				from: "assistant",
+				content: "Submitted.",
+				updates: [
+					{
+						...callUpdate("u1", "hf_jobs", { operation: "uv" }),
+						argumentsRaw: raw,
+						fileRefs: [{ ref: "v-file://train.py", name: "train.py", version: 4 }],
+					},
+					resultUpdate("u1", "hf_jobs", "job started"),
+				],
+			},
+		];
+		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		const assistant = prepared[1];
+		if (assistant.role !== "assistant" || !assistant.tool_calls) throw new Error("no tool_calls");
+		expect(assistant.tool_calls[0].function.arguments).toBe(raw);
+		expect(JSON.stringify(prepared)).not.toContain("fileRefs");
+	});
+
 	it("groups parallel calls of one round into a single assistant message", async () => {
 		const messages: EndpointMessage[] = [
 			{
@@ -215,12 +253,12 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 	});
 
 	it("degrades the oldest turns to flat messages once the replay budget is spent", async () => {
-		// Each turn carries ~7×8k of tool output, so two turns exceed the 100k
+		// Each turn carries ~28×8k of tool output, so two turns exceed the 400k
 		// budget: the newest keeps its tool history, the oldest goes flat.
 		const bigTurn = (prefix: string): EndpointMessage => ({
 			from: "assistant",
 			content: `${prefix} done`,
-			updates: Array.from({ length: 7 }, (_, i) => [
+			updates: Array.from({ length: 28 }, (_, i) => [
 				callUpdate(`${prefix}${i}`, "search", { q: String(i) }),
 				resultUpdate(`${prefix}${i}`, "search", "x".repeat(8000)),
 			]).flat(),
@@ -235,39 +273,72 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		});
 		expect(prepared[0]).toEqual({ role: "assistant", content: "old done" });
 		expect(prepared[1]).toEqual({ role: "user", content: "next" });
-		expect(prepared.filter((m) => m.role === "tool")).toHaveLength(7);
+		expect(prepared.filter((m) => m.role === "tool")).toHaveLength(28);
 	});
 
-	it("charges plain messages against the budget, so a long history leaves less room for replay", async () => {
-		// One tool turn that fits the budget on its own. Preceded by a user turn
-		// large enough to consume the budget by itself, it must flatten: the cap
-		// covers the whole outgoing history, not just the replayed part, or a
-		// conversation that already fills a context window would still be handed
-		// another budget's worth on top.
-		const toolTurn: EndpointMessage = {
+	it("charges plain messages against the budget, but ballast can never flatten the newest turn", async () => {
+		// The cap covers the whole outgoing history, so a user turn large enough
+		// to consume the budget flattens OLDER tool turns. The newest replayable
+		// turn is exempt: it is the turn a continuation resumes into, and its
+		// transcript is the run's working state — only a window that could not
+		// carry it at all may degrade it (see the newest-candidate rule).
+		const toolTurn = (id: string): EndpointMessage => ({
 			from: "assistant",
-			content: "done",
-			updates: [callUpdate("c1", "search", { q: "x" }), resultUpdate("c1", "search", "result")],
-		};
-
-		const withoutBallast = await prepareMessagesWithFiles(
-			[{ from: "user", content: "hi" }, toolTurn, { from: "user", content: "next" }],
-			imageProcessor,
-			false,
-			{ replayToolHistory: true }
-		);
-		expect(withoutBallast.filter((m) => m.role === "tool")).toHaveLength(1);
+			content: `${id} done`,
+			updates: [callUpdate(id, "search", { q: "x" }), resultUpdate(id, "search", `${id} result`)],
+		});
 
 		const withBallast = await prepareMessagesWithFiles(
-			[{ from: "user", content: "x".repeat(120_000) }, toolTurn, { from: "user", content: "next" }],
+			[
+				{ from: "user", content: "x".repeat(450_000) },
+				toolTurn("older"),
+				{ from: "user", content: "next" },
+				toolTurn("newest"),
+			],
 			imageProcessor,
 			false,
 			{ replayToolHistory: true }
 		);
-		expect(withBallast.filter((m) => m.role === "tool")).toHaveLength(0);
-		// Degraded, never dropped — the user's own text is untouched.
+		const toolMessages = withBallast.filter((m) => m.role === "tool");
+		expect(toolMessages).toHaveLength(1);
+		expect(String(toolMessages[0]?.content)).toContain("newest result");
+		// The older turn degraded, never dropped — and the user's text is untouched.
+		expect(withBallast).toContainEqual({ role: "assistant", content: "older done" });
 		expect(withBallast.filter((m) => m.role === "user")).toHaveLength(2);
-		expect(withBallast).toContainEqual({ role: "assistant", content: "done" });
+	});
+
+	it("keeps a failed turn's replay through a resume message, dangling call repaired", async () => {
+		// The resume-after-failure shape: the newest assistant turn died mid-tool-call
+		// and a user message follows it asking the model to continue. The exemption is
+		// positional (newest assistant candidate), so the trailing user message must
+		// not cost the failed turn its transcript — that transcript is exactly the
+		// work resume exists to preserve — and the call that never recorded a result
+		// must replay as an explicit interruption, not be dropped or 400 the request.
+		const prepared = await prepareMessagesWithFiles(
+			[
+				{ from: "user", content: "x".repeat(450_000) },
+				{
+					from: "assistant",
+					content: "",
+					updates: [
+						callUpdate("done1", "create_repo", { name: "repo" }),
+						resultUpdate("done1", "create_repo", "created pngwn/repo"),
+						callUpdate("dangling", "hf_jobs", { command: "run" }),
+					],
+				},
+				{ from: "user", content: "Your previous turn failed partway through. Continue." },
+			],
+			imageProcessor,
+			false,
+			{ replayToolHistory: true }
+		);
+		const toolMessages = prepared.filter((m) => m.role === "tool");
+		expect(toolMessages).toHaveLength(2);
+		expect(String(toolMessages[0]?.content)).toContain("created pngwn/repo");
+		expect(String(toolMessages[1]?.content)).toBe(
+			"Error: interrupted before a result was recorded"
+		);
+		expect(prepared.at(-1)?.role).toBe("user");
 	});
 
 	describe("context-aware budget", () => {
@@ -335,6 +406,35 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 			expect(await replayed(98_304)).toBe(0);
 		});
 
+		it("fits the newest turn beside the flat floor when the window is real", async () => {
+			// Codex review: ~60k of flat floor plus an ~80k replay upgrade passed a
+			// ~96k window budget, because the newest-turn exemption judged the
+			// upgrade against the whole budget — sending ~140k characters the
+			// provider rejects outright, failing the turn. Against a real window
+			// the newest turn must fit beside the floor; the ballast exemption is
+			// soft-ceiling only (see the ballast test above).
+			const ballasted: EndpointMessage[] = [
+				{ from: "user", content: "y".repeat(60_000) },
+				bigTurn,
+				{ from: "user", content: "next" },
+			];
+			const replayedTools = async (contextLengthTokens?: number) =>
+				(
+					await prepareMessagesWithFiles(ballasted, imageProcessor, false, {
+						replayToolHistory: true,
+						contextLengthTokens,
+					})
+				).filter((m) => m.role === "tool").length;
+
+			// Room for floor and replay together: the transcript survives.
+			expect(await replayedTools(131_072)).toBe(10);
+			// The upgrade alone fits the ~96k budget, floor + upgrade does not:
+			// degrade rather than send a request the model cannot accept.
+			expect(await replayedTools(40_000)).toBe(0);
+			// No window reported: the soft-ceiling ballast exemption still holds.
+			expect(await replayedTools(undefined)).toBe(10);
+		});
+
 		it("sends the pre-replay shape when the window is smaller than the reserve", async () => {
 			const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
 				replayToolHistory: true,
@@ -383,7 +483,8 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 	it("dedups a round preamble persisted with leading whitespace", async () => {
 		// The pre-tool stream often starts with newlines after a think block; a
 		// Call update persisted untrimmed must still match the trim-normalized
-		// visible text, or the preamble replays twice.
+		// visible text, or the preamble replays twice. The round itself replays the
+		// bytes the live loop sent, so the provider's cached prefix still matches.
 		const messages: EndpointMessage[] = [
 			{
 				from: "assistant",
@@ -403,7 +504,7 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		});
 		const roundMessage = prepared[0] as { content?: string };
 		const finalMessage = prepared.at(-1) as { content?: string };
-		expect(roundMessage.content).toBe("Let me check that.");
+		expect(roundMessage.content).toBe("\n\nLet me check that.");
 		expect(finalMessage.content).toContain("Here is the answer.");
 		expect(finalMessage.content).not.toContain("Let me check that.");
 	});
@@ -476,8 +577,9 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 	});
 
 	it("never expands an older turn when a newer turn already fell back to flat", async () => {
-		// The newest turn alone exceeds the 100k budget, so it goes flat; the
-		// older turn must then go flat too, even though it would fit on its own.
+		// The newest turn alone exceeds the whole 400k ceiling — the one case
+		// that may degrade it — so it goes flat; the older turn must then go
+		// flat too, even though it would fit on its own.
 		const turn = (prefix: string, calls: number): EndpointMessage => ({
 			from: "assistant",
 			content: `${prefix} done`,
@@ -489,7 +591,7 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		const messages: EndpointMessage[] = [
 			turn("old", 2),
 			{ from: "user", content: "next" },
-			turn("new", 14),
+			turn("new", 60),
 		];
 		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
 			replayToolHistory: true,
@@ -514,7 +616,7 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		const huge: EndpointMessage = {
 			from: "assistant",
 			content: "new done",
-			updates: Array.from({ length: 14 }, (_, i) => [
+			updates: Array.from({ length: 60 }, (_, i) => [
 				callUpdate(`new${i}`, "search", { q: String(i) }),
 				resultUpdate(`new${i}`, "search", "x".repeat(8000)),
 			]).flat(),
@@ -606,13 +708,13 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 	});
 
 	it("attachReasoning spends the same replay budget, oldest turns first, without leaking <think> in the fallback", async () => {
-		// Two turns of ~60k reasoning exceed the 100k budget: the newest keeps
+		// Two turns of ~250k reasoning exceed the 400k budget: the newest keeps
 		// reasoning_content, the oldest falls back to a <think>-stripped flat
 		// shape (not the raw string) so models that must never see historical
 		// thoughts (e.g. Gemma) don't get them just because the budget ran out.
 		const bigReasoningTurn = (n: number): EndpointMessage => ({
 			from: "assistant",
-			content: `<think>${"x".repeat(60_000)}</think>answer ${n}`,
+			content: `<think>${"x".repeat(250_000)}</think>answer ${n}`,
 		});
 		const messages: EndpointMessage[] = [bigReasoningTurn(1), bigReasoningTurn(2)];
 		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
@@ -719,7 +821,7 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 	it("strips <think> from the replayToolHistory budget fallback instead of leaking it raw", async () => {
 		const bigTurn = (n: number): EndpointMessage => ({
 			from: "assistant",
-			content: `<think>${"x".repeat(60_000)}</think>answer ${n}`,
+			content: `<think>${"x".repeat(250_000)}</think>answer ${n}`,
 			updates: [
 				callUpdate(`c${n}`, "search", { q: String(n) }),
 				resultUpdate(`c${n}`, "search", "x".repeat(60_000)),
@@ -729,8 +831,8 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		const prepared = await prepareMessagesWithFiles(messages, imageProcessor, false, {
 			replayToolHistory: true,
 		});
-		// turn 1 (oldest) fell back to flat because turn 2 alone (~68k of
-		// reasoning + capped tool output) already spends most of the 100k
+		// turn 1 (oldest) fell back to flat because turn 2 alone (~258k of
+		// reasoning + capped tool output) already spends most of the 400k
 		// budget: it must be plain content with no reasoning_content leaking
 		// through, and no raw <think> tag either.
 		const flatCandidates = prepared.filter(
@@ -970,5 +1072,628 @@ describe("prepareMessagesWithFiles tool history replay", () => {
 		});
 		const callMessage = prepared[0] as { tool_calls?: Array<{ id: string }> };
 		expect(callMessage.tool_calls?.[0]?.id).toBe("u10000000");
+	});
+});
+
+type Sent = OpenAI.Chat.Completions.ChatCompletionMessageParam;
+
+const user = (id: string, content: string): HistoryMessage => ({ id, from: "user", content });
+
+const toolTurn = (
+	id: string,
+	rounds: number,
+	outputChars: number,
+	output: (round: number) => string = () => ""
+): HistoryMessage => ({
+	id,
+	from: "assistant",
+	content: `${id} done`,
+	updates: Array.from({ length: rounds }, (_, i) => [
+		callUpdate(`${id}r${i}`, "search", { q: String(i) }),
+		resultUpdate(`${id}r${i}`, "search", output(i).padEnd(outputChars, "x")),
+	]).flat(),
+});
+
+const windowOptions = {
+	replayToolHistory: true,
+	contextLengthTokens: 1_048_576,
+	slidingWindow: true,
+} as const;
+
+async function unitsOf(messages: HistoryMessage[]): Promise<HistoryUnit[]> {
+	const history = await prepareHistory(messages, imageProcessor, false, windowOptions);
+	if (!history.units) throw new Error("expected the sliding window to apply");
+	return history.units;
+}
+
+function expectPaired(messages: Sent[]) {
+	const open = new Set<string>();
+	for (const message of messages) {
+		if (message.role === "tool") {
+			expect(open.has(message.tool_call_id)).toBe(true);
+			open.delete(message.tool_call_id);
+			continue;
+		}
+		expect(open.size).toBe(0);
+		if (message.role === "assistant") message.tool_calls?.forEach((call) => open.add(call.id));
+	}
+	expect(open.size).toBe(0);
+}
+
+const textOf = (message: Sent | undefined) =>
+	typeof message?.content === "string" ? message.content : JSON.stringify(message?.content);
+
+describe("sliding history window", () => {
+	const longRun = () =>
+		Array.from({ length: 5 }, (_, t) => [
+			user(`u${t}`, `ask ${t}`),
+			toolTurn(`a${t}`, 12, 30_000),
+		]).flat();
+
+	it("replays every turn whole and every output uncapped while the request fits the window", async () => {
+		const prepared = await prepareMessagesWithFiles(
+			longRun(),
+			imageProcessor,
+			false,
+			windowOptions
+		);
+		const tools = prepared.filter((m) => m.role === "tool");
+		expect(tools).toHaveLength(60);
+		expect(tools.every((m) => textOf(m).length === 30_000)).toBe(true);
+		expect(prepared.filter((m) => m.role === "user")).toHaveLength(5);
+	});
+
+	it("restores the legacy budget and per-output cap when the flag is off", async () => {
+		const prepared = await prepareMessagesWithFiles(longRun(), imageProcessor, false, {
+			...windowOptions,
+			slidingWindow: false,
+		});
+		const tools = prepared.filter((m) => m.role === "tool");
+		expect(tools.length).toBeGreaterThan(0);
+		expect(tools.length).toBeLessThan(60);
+		expect(textOf(tools[0])).toBe("x".repeat(8000) + "\n[...truncated]");
+		expect(prepared[1]).toEqual({ role: "assistant", content: "a0 done" });
+	});
+
+	it("keeps the legacy budget for a model that reports no window", async () => {
+		const options = { replayToolHistory: true, slidingWindow: true } as const;
+		const withFlag = await prepareMessagesWithFiles(longRun(), imageProcessor, false, options);
+		const legacy = await prepareMessagesWithFiles(longRun(), imageProcessor, false, {
+			...options,
+			slidingWindow: false,
+		});
+		expect(withFlag).toEqual(legacy);
+		expect(withFlag.filter((m) => m.role === "tool").length).toBeLessThan(60);
+	});
+
+	it("never separates a tool result from its call, whatever the limit", async () => {
+		const parallel: HistoryMessage = {
+			id: "a0",
+			from: "assistant",
+			content: "a0 done",
+			updates: Array.from({ length: 4 }, (_, i) => [
+				callUpdate(`p${i}a`, "search", { q: "a" }),
+				callUpdate(`p${i}b`, "search", { q: "b" }),
+				resultUpdate(`p${i}a`, "search", "y".repeat(5_000)),
+				resultUpdate(`p${i}b`, "search", "z".repeat(5_000)),
+			]).flat(),
+		};
+		const units = await unitsOf([
+			{ id: "sys", from: "system", content: "SYSTEM" },
+			user("u0", "BRIEF"),
+			parallel,
+			user("u1", "more"),
+			toolTurn("a1", 6, 5_000),
+			user("u2", "LIVE"),
+			toolTurn("a2", 5, 5_000),
+		]);
+		for (let limitChars = 0; limitChars <= 200_000; limitChars += 4_000) {
+			const sent = renderWindow(units, planWindow(units, { limitChars, fixedChars: 0 }));
+			expectPaired(sent);
+			expect(sent[0]).toEqual({ role: "system", content: "SYSTEM" });
+			expect(textOf(sent[1])).toContain("BRIEF");
+			expect(sent.some((m) => m.role === "user" && textOf(m).includes("LIVE"))).toBe(true);
+		}
+	});
+
+	it("keeps the system prompt, the brief and answered questions, and marks the gap", async () => {
+		const units = await unitsOf([
+			{ id: "sys", from: "system", content: "SYSTEM" },
+			user("u0", "BRIEF"),
+			{
+				id: "a0",
+				from: "assistant",
+				content: "Asked.",
+				updates: [
+					callUpdate("q1", "ask_user_question", {}),
+					resultUpdate("q1", "ask_user_question", "ANSWER: use LoRA"),
+				],
+			},
+			user("u1", "next"),
+			toolTurn("a1", 10, 10_000, (i) => `OLD${i}`),
+			user("u2", "LIVE"),
+		]);
+		const plan = planWindow(units, { limitChars: 40_000, fixedChars: 0 });
+		expect(plan.moved).toBe(true);
+		const sent = renderWindow(units, plan);
+		expectPaired(sent);
+		expect(sent[0]).toEqual({ role: "system", content: "SYSTEM" });
+		expect(textOf(sent[1])).toMatch(/^BRIEF\n\n\[Earlier history omitted: /);
+		const question = sent.find((m) => m.role === "assistant" && m.tool_calls);
+		expect(question?.role === "assistant" && question.tool_calls?.[0]?.function.name).toBe(
+			"ask_user_question"
+		);
+		expect(sent.some((m) => m.role === "tool" && textOf(m) === "ANSWER: use LoRA")).toBe(true);
+		expect(JSON.stringify(sent)).not.toContain("OLD0");
+		expect(JSON.stringify(sent)).not.toContain("Asked.");
+		expect(sent.at(-1)).toEqual({ role: "user", content: "LIVE" });
+	});
+
+	it("counts what it dropped and folds the brief into the next user message", async () => {
+		const units = await unitsOf([
+			user("u0", "BRIEF"),
+			toolTurn("a0", 3, 1_000),
+			user("u1", "second"),
+			toolTurn("a1", 3, 1_000),
+			user("u2", "third"),
+			toolTurn("a2", 3, 1_000),
+			user("u3", "fourth"),
+		]);
+		const plan = planWindow(units, {
+			limitChars: 1_000_000,
+			fixedChars: 0,
+			stored: { messageId: "u2", round: 0 },
+		});
+		expect(plan.moved).toBe(false);
+		const sent = renderWindow(units, plan);
+		expect(sent[0]).toEqual({
+			role: "user",
+			content: `BRIEF\n\n${omittedMarker(1, 6)}\n\nthird`,
+		});
+		expect(sent.filter((m) => m.role === "tool")).toHaveLength(3);
+		sent.forEach((m, i) => expect(m.role === "user" && sent[i + 1]?.role === "user").toBe(false));
+	});
+
+	it("slides inside a monster live turn by rounds, never flattening it", async () => {
+		const live: HistoryMessage = { ...toolTurn("a1", 60, 20_000, (i) => `R${i}:`), content: "" };
+		const units = await unitsOf([
+			user("u0", "BRIEF"),
+			toolTurn("a0", 1, 1_000),
+			user("u1", "GO"),
+			live,
+		]);
+		const limitChars = 400_000;
+		const plan = planWindow(units, { limitChars, fixedChars: 0 });
+		expect(plan.moved).toBe(true);
+		expect(plan.chars).toBeLessThanOrEqual(limitChars / 2);
+		const sent = renderWindow(units, plan);
+		expectPaired(sent);
+		expect(textOf(sent[0])).toMatch(
+			/^BRIEF\n\n\[Earlier history omitted: 0 turns \/ \d+ tool rounds\.[^\]]*\]\n\nGO$/
+		);
+		const kept = sent.filter((m) => m.role === "tool").map((m) => textOf(m).split(":")[0]);
+		const newest = Array.from({ length: kept.length }, (_, i) => `R${60 - kept.length + i}`);
+		expect(kept).toEqual(newest);
+		expect(kept.length).toBeGreaterThan(0);
+		expect(sent.filter((m) => m.role === "tool").every((m) => textOf(m).length === 20_000)).toBe(
+			true
+		);
+		expect(sent.filter((m) => m.role === "assistant").every((m) => m.tool_calls)).toBe(true);
+	});
+
+	describe("the stored start", () => {
+		const limitChars = 200_000;
+		const growing = (rounds: number) =>
+			unitsOf([user("u0", "BRIEF"), toolTurn("a0", rounds, 10_000)]);
+
+		it("holds until a request passes the trigger, then jumps to about half the limit", async () => {
+			const underTrigger = planWindow(await growing(14), { limitChars, fixedChars: 0 });
+			expect(underTrigger).toMatchObject({ moved: false, start: undefined });
+
+			const overTrigger = planWindow(await growing(16), { limitChars, fixedChars: 0 });
+			expect(overTrigger.moved).toBe(true);
+			expect(overTrigger.chars).toBeLessThanOrEqual(limitChars / 2);
+			const first = overTrigger.start;
+			expect(first?.messageId).toBe("a0");
+
+			const grown = await growing(19);
+			const held = planWindow(grown, { limitChars, fixedChars: 0, stored: first });
+			expect(held).toMatchObject({ moved: false, start: first });
+			expect(held.chars).toBeGreaterThan(limitChars / 2);
+			expect(grown[held.from].start).toEqual(first);
+
+			const next = planWindow(await growing(24), { limitChars, fixedChars: 0, stored: first });
+			expect(next.moved).toBe(true);
+			expect(next.start?.round).toBeGreaterThan(first?.round ?? Infinity);
+			expect(next.chars).toBeLessThanOrEqual(limitChars / 2);
+		});
+
+		it("keeps and stores the start of a tool-less conversation", async () => {
+			await ready;
+			const conversationId = new ObjectId();
+			await collections.conversations.insertOne({
+				_id: conversationId,
+				model: "m",
+				title: "t",
+				messages: [],
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			} satisfies Conversation);
+			const answer = (id: string, fill: string, chars: number): HistoryMessage => ({
+				id,
+				from: "assistant",
+				content: fill.repeat(chars),
+			});
+			const firstThree = [
+				user("u0", "One?"),
+				answer("a0", "a", 250_000),
+				user("u1", "Two?"),
+				answer("a1", "b", 250_000),
+				user("u2", "Three?"),
+				answer("a2", "c", 250_000),
+				user("u3", "Four?"),
+			];
+			const options = {
+				contextLengthTokens: 262_144,
+				slidingWindow: true,
+				window: { conversationId },
+			};
+			const slid = await prepareMessagesWithFiles(firstThree, imageProcessor, false, options);
+			expect(JSON.stringify(slid)).not.toContain("bbbbbbbbbb");
+			const stored = (await collections.conversations.findOne({ _id: conversationId }))
+				?.historyWindow;
+			expect(stored).toEqual({ messageId: "u2", round: 0, limitChars: 774_144 });
+
+			const later = [...firstThree, answer("a3", "d", 200_000), user("u4", "Five?")];
+			const held = await prepareMessagesWithFiles(later, imageProcessor, false, {
+				...options,
+				window: { conversationId, stored },
+			});
+			expect(JSON.stringify(held)).toContain("cccccccccc");
+			const unstored = await prepareMessagesWithFiles(later, imageProcessor, false, {
+				...options,
+				window: undefined,
+			});
+			expect(JSON.stringify(unstored)).not.toContain("cccccccccc");
+			await collections.conversations.deleteOne({ _id: conversationId });
+		});
+
+		it("recomputes from the beginning when the start is not on the replayed path", async () => {
+			const elsewhere = { messageId: "another-branch", round: 3 };
+			const small = await growing(14);
+			expect(planWindow(small, { limitChars, fixedChars: 0, stored: elsewhere })).toEqual(
+				planWindow(small, { limitChars, fixedChars: 0 })
+			);
+			const large = await growing(16);
+			expect(planWindow(large, { limitChars, fixedChars: 0, stored: elsewhere })).toEqual(
+				planWindow(large, { limitChars, fixedChars: 0 })
+			);
+		});
+	});
+});
+
+describe("harness events in replay", () => {
+	const EVENT_TEXT =
+		"[Harness event, not part of this tool result]\nJob sft-smoke (a10g-small) failed: ERROR after 2m17s. Read its logs with check_job before changing anything.";
+	const eventUpdate = (afterToolUuid: string) =>
+		({
+			type: MessageUpdateType.HarnessEvent,
+			events: [
+				{
+					serviceId: "svc",
+					kind: "job",
+					jobId: "0123456789abcdef01234567",
+					name: "sft-smoke",
+					from: "RUNNING",
+					to: "ERROR",
+					ranSeconds: 137,
+					at: 0,
+				},
+			],
+			text: EVENT_TEXT,
+			afterToolUuid,
+		}) satisfies MessageUpdate;
+
+	const withEvent = (output = "18°C, sunny"): HistoryMessage[] => [
+		user("u0", "weather and forecast?"),
+		{
+			id: "a0",
+			from: "assistant",
+			content: "Sunny all week.",
+			contentShape: 2,
+			updates: [
+				callUpdate("w1", "get_weather", { city: "Paris" }),
+				callUpdate("w2", "get_weather", { city: "Lyon" }),
+				resultUpdate("w1", "get_weather", "12°C, rain"),
+				resultUpdate("w2", "get_weather", output),
+				eventUpdate("w2"),
+				callUpdate("f1", "get_forecast", { city: "Paris" }),
+				resultUpdate("f1", "get_forecast", "sunny all week"),
+			],
+		},
+	];
+	const legacyOf = (messages: HistoryMessage[]): HistoryMessage[] =>
+		messages.map((m) => {
+			if (m.from !== "assistant") return m;
+			const legacy = { ...m };
+			delete legacy.contentShape;
+			return legacy;
+		});
+
+	it("appends the text to the result of the call it followed, in either stored shape", async () => {
+		const rounds = await prepareMessagesWithFiles(withEvent(), imageProcessor, false, {
+			replayToolHistory: true,
+		});
+		const legacy = await prepareMessagesWithFiles(legacyOf(withEvent()), imageProcessor, false, {
+			replayToolHistory: true,
+		});
+
+		expect(rounds).toEqual(legacy);
+		expect(rounds.map((m) => m.role)).toEqual([
+			"user",
+			"assistant",
+			"tool",
+			"tool",
+			"assistant",
+			"tool",
+			"assistant",
+		]);
+		expect(textOf(rounds[2])).toBe("12°C, rain");
+		expect(textOf(rounds[3])).toBe(`18°C, sunny\n\n${EVENT_TEXT}`);
+		expect(textOf(rounds[5])).toBe("sunny all week");
+	});
+
+	it("caps the output and never the event when the legacy budget applies", async () => {
+		const output = "y".repeat(9_000);
+		const replayed = await prepareMessagesWithFiles(withEvent(output), imageProcessor, false, {
+			replayToolHistory: true,
+			slidingWindow: false,
+		});
+
+		expect(textOf(replayed[3])).toBe(`${"y".repeat(8000)}\n[...truncated]\n\n${EVENT_TEXT}`);
+	});
+
+	it("keeps the event inside its round's unit", async () => {
+		const units = await unitsOf(withEvent());
+		const without = await unitsOf(
+			withEvent().map((m) =>
+				m.from === "assistant"
+					? { ...m, updates: m.updates?.filter((u) => u.type !== MessageUpdateType.HarnessEvent) }
+					: m
+			)
+		);
+
+		expect(units.map((unit) => unit.messages.length)).toEqual(
+			without.map((unit) => unit.messages.length)
+		);
+		const round = units.find((unit) =>
+			unit.messages.some((m) => typeof m.content === "string" && m.content.includes(EVENT_TEXT))
+		);
+		expect(round?.rounds).toBe(1);
+		expect(round?.start).toEqual({ messageId: "a0", round: 0 });
+		expect(textOf(round?.messages.at(-1))).toContain(EVENT_TEXT);
+	});
+});
+
+describe("failed job note in replay", () => {
+	const failed = (): HistoryMessage[] => [
+		user("u0", "train it"),
+		{
+			id: "a0",
+			from: "assistant",
+			content: "",
+			contentShape: 2,
+			updates: [
+				callUpdate("c1", "check_job", { job_id: "j1", task: "did it start?" }),
+				resultUpdate("c1", "check_job", "- Status: failed.\n- If it failed: ImportError"),
+			],
+		},
+	];
+
+	it("adds the note to a failed check_job report, as the live request does", async () => {
+		const replayed = await prepareMessagesWithFiles(failed(), imageProcessor, false, {
+			replayToolHistory: true,
+		});
+
+		expect(textOf(replayed[2])).toBe(
+			withJobFailedNote("check_job", "- Status: failed.\n- If it failed: ImportError")
+		);
+		expect(textOf(replayed[2])).toContain(JOB_FAILED_NOTE);
+	});
+});
+
+describe("tool images in replay", () => {
+	const passThrough = (async (file: { value: string; mime: string }) => ({
+		image: Buffer.from(file.value, "base64"),
+		mime: file.mime,
+	})) as unknown as ReturnType<typeof makeImageProcessor>;
+
+	const imageResult = (uuid: string, ...blocks: Record<string, unknown>[]) =>
+		({
+			type: MessageUpdateType.Tool,
+			subtype: MessageToolUpdateType.Result,
+			uuid,
+			result: {
+				status: ToolResultStatus.Success,
+				call: { name: "hf_fs", parameters: {} },
+				outputs: [{ text: `attached ${uuid}`, content: blocks }],
+			},
+		}) satisfies MessageUpdate;
+
+	const png = (data: string) => ({ type: "image", data, mimeType: "image/png" });
+
+	const turnsAttaching = (...turns: Record<string, unknown>[][]): EndpointMessage[] =>
+		turns.flatMap((blocks, i) => [
+			{ from: "user" as const, content: `q${i}` },
+			{
+				from: "assistant" as const,
+				content: `a${i}`,
+				updates: [callUpdate(`call${i}`, "hf_fs", {}), imageResult(`call${i}`, ...blocks)],
+			},
+		]);
+
+	const sentImages = (messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]) =>
+		messages.flatMap((m) =>
+			m.role === "user" && Array.isArray(m.content)
+				? m.content.flatMap((p) => (p.type === "image_url" ? [p.image_url.url] : []))
+				: []
+		);
+
+	it("re-sends only the newest images, after their round's results, and names the rest", async () => {
+		const messages = turnsAttaching(
+			[png("AAAA")],
+			[png("BBBB"), png("CCCC")],
+			[png("DDDD"), png("EEEE")]
+		);
+		const prepared = await prepareMessagesWithFiles(messages, passThrough, true, {
+			replayToolHistory: true,
+		});
+		expect(sentImages(prepared)).toEqual(
+			["BBBB", "CCCC", "DDDD", "EEEE"].map((d) => `data:image/png;base64,${d}`)
+		);
+		const firstTool = prepared.find((m) => m.role === "tool");
+		expect(String(firstTool?.content)).toBe(
+			"attached call0\n\n[This result included an image no longer shown to you, to keep the request small. Attach it again if you need to look.]"
+		);
+		const at = prepared.findIndex(
+			(m) => m.role === "tool" && m.tool_call_id !== firstTool?.tool_call_id
+		);
+		expect(prepared[at + 1]).toMatchObject({ role: "user" });
+		expect(prepared[at + 2]).toEqual({ role: "assistant", content: "a1" });
+	});
+
+	it("only notes the images for a model without image input", async () => {
+		const prepared = await prepareMessagesWithFiles(
+			turnsAttaching([png("AAAA")]),
+			passThrough,
+			false,
+			{
+				replayToolHistory: true,
+			}
+		);
+		expect(sentImages(prepared)).toEqual([]);
+		expect(prepared.map((m) => m.role)).toEqual(["user", "assistant", "tool", "assistant"]);
+		expect(String(prepared[2].content)).toMatch(/that was not passed to you/);
+	});
+
+	it("reads an image stored by hash through the reader", async () => {
+		const readToolImage = vi.fn(async () => ({
+			type: "base64" as const,
+			name: "stored",
+			value: "SHAA",
+			mime: "image/jpeg",
+		}));
+		const prepared = await prepareMessagesWithFiles(
+			turnsAttaching([{ type: "image", sha: "f00d", mimeType: "image/jpeg" }]),
+			passThrough,
+			true,
+			{ replayToolHistory: true, readToolImage }
+		);
+		expect(readToolImage).toHaveBeenCalledWith({ mimeType: "image/jpeg", sha: "f00d" });
+		expect(sentImages(prepared)).toEqual(["data:image/jpeg;base64,SHAA"]);
+	});
+
+	it("keeps a replayed image inside its round's unit and charges it the nominal image cost", async () => {
+		const big = "x".repeat(200_000);
+		const { units } = await prepareHistory(turnsAttaching([png(big)]), passThrough, true, {
+			replayToolHistory: true,
+			contextLengthTokens: 1_000_000,
+			slidingWindow: true,
+		});
+		const round = units?.find((unit) => unit.rounds === 1);
+		expect(round?.messages.map((m) => m.role)).toEqual(["assistant", "tool", "user"]);
+		expect(historyCost(round?.messages)).toBeLessThan(10_000);
+	});
+});
+
+describe("tool images before the next user message", () => {
+	const passThrough = (async (file: { value: string; mime: string }) => ({
+		image: Buffer.from(file.value, "base64"),
+		mime: file.mime,
+	})) as unknown as ReturnType<typeof makeImageProcessor>;
+
+	const interrupted: EndpointMessage = {
+		from: "assistant",
+		content: "",
+		updates: [
+			callUpdate("call0", "hf_fs", {}),
+			{
+				type: MessageUpdateType.Tool,
+				subtype: MessageToolUpdateType.Result,
+				uuid: "call0",
+				result: {
+					status: ToolResultStatus.Success,
+					call: { name: "hf_fs", parameters: {} },
+					outputs: [
+						{ text: "attached", content: [{ type: "image", data: "AAAA", mimeType: "image/png" }] },
+					],
+				},
+			},
+		],
+	};
+
+	it("never puts the images straight before the next user message", async () => {
+		const prepared = await prepareMessagesWithFiles(
+			[{ from: "user", content: "q0" }, interrupted, { from: "user", content: "q1" }],
+			passThrough,
+			true,
+			{ replayToolHistory: true }
+		);
+		expect(prepared.map((m) => m.role)).toEqual(["user", "assistant", "tool", "user"]);
+		expect(String(prepared[2].content)).toMatch(/no longer shown to you/);
+	});
+
+	it("still sends them when the turn is the one being continued", async () => {
+		const prepared = await prepareMessagesWithFiles(
+			[{ from: "user", content: "q0" }, interrupted],
+			passThrough,
+			true,
+			{ replayToolHistory: true }
+		);
+		expect(prepared.map((m) => m.role)).toEqual(["user", "assistant", "tool", "user"]);
+		expect(JSON.stringify(prepared[3])).toContain("data:image/png;base64,AAAA");
+	});
+});
+
+describe("queued user messages in replay", () => {
+	const QUEUED_TEXT =
+		"[The user sent this while you were working.]\n<user_message>\nuse Lyon too\n</user_message>";
+
+	it("appends what the user sent mid-turn to the result it followed, after any event", async () => {
+		const history: HistoryMessage[] = [
+			user("u0", "weather?"),
+			{
+				id: "a0",
+				from: "assistant",
+				content: "Both are sunny.",
+				contentShape: 2,
+				updates: [
+					callUpdate("w1", "get_weather", { city: "Paris" }),
+					resultUpdate("w1", "get_weather", "18°C, sunny"),
+					{
+						type: MessageUpdateType.QueuedInput,
+						inputs: [{ id: "q1", text: "use Lyon too", at: 0 }],
+						text: QUEUED_TEXT,
+						afterToolUuid: "w1",
+					},
+					callUpdate("w2", "get_weather", { city: "Lyon" }),
+					resultUpdate("w2", "get_weather", "20°C, sunny"),
+				],
+			},
+		];
+		const replayed = await prepareMessagesWithFiles(history, imageProcessor, false, {
+			replayToolHistory: true,
+		});
+
+		expect(replayed.map((m) => m.role)).toEqual([
+			"user",
+			"assistant",
+			"tool",
+			"assistant",
+			"tool",
+			"assistant",
+		]);
+		expect(textOf(replayed[2])).toBe(`18°C, sunny\n\n${QUEUED_TEXT}`);
+		expect(textOf(replayed[4])).toBe("20°C, sunny");
 	});
 });

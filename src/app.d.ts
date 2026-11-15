@@ -13,8 +13,12 @@ declare global {
 			user?: User;
 			isAdmin: boolean;
 			token?: string;
-			/** Organization to bill inference requests to (from settings) */
+			/** Organization to bill inference, and ML Intern's Jobs and sandboxes, to (from settings) */
 			billingOrganization?: string;
+			/** Enterprise resource group within billingOrganization used for cost attribution. */
+			billingResourceGroup?: string;
+			/** Server-configured default Hub publishing namespace. */
+			publishNamespace?: string;
 		}
 
 		interface Error {

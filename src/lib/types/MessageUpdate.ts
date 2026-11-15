@@ -1,5 +1,15 @@
 import type { InferenceProvider } from "@huggingface/inference";
 import type { ToolCall, ToolResult } from "$lib/types/Tool";
+import type { PlanStep } from "$lib/types/Plan";
+import type { TurnStatus } from "$lib/types/TurnState";
+import type { MlServiceKind, ServicePush } from "$lib/types/MlService";
+import type {
+	ElicitationAction,
+	ElicitationRequestPayload,
+	ElicitationResolution,
+	ElicitationValue,
+} from "$lib/types/McpElicitation";
+import type { MlFileRef } from "$lib/types/MlFile";
 
 export type MessageUpdate =
 	| MessageStatusUpdate
@@ -9,7 +19,15 @@ export type MessageUpdate =
 	| MessageFileUpdate
 	| MessageFinalAnswerUpdate
 	| MessageReasoningUpdate
-	| MessageRouterMetadataUpdate;
+	| MessageRouterMetadataUpdate
+	| MessageElicitationUpdate
+	| MessagePlanUpdate
+	| MessageBudgetUpdate
+	| MessageTurnStateUpdate
+	| MessageHarnessEventUpdate
+	| MessageNoticeUpdate
+	| MessageQueuedInputUpdate
+	| MessageReviewUpdate;
 
 export enum MessageUpdateType {
 	Status = "status",
@@ -20,6 +38,31 @@ export enum MessageUpdateType {
 	FinalAnswer = "finalAnswer",
 	Reasoning = "reasoning",
 	RouterMetadata = "routerMetadata",
+	Elicitation = "elicitation",
+	Plan = "plan",
+	Budget = "budget",
+	TurnState = "turnState",
+	HarnessEvent = "harnessEvent",
+	Notice = "notice",
+	QueuedInput = "queuedInput",
+	Review = "review",
+}
+
+/**
+ * In-band turn lifecycle transition (see TurnState). Delivered on the same
+ * channel as every other update so a subscriber learns about parks, resumes
+ * and endings without a side channel, and replay reproduces the history.
+ * Times are epoch milliseconds; `serverNow` is stamped at emission so the
+ * client can correct clock skew and render true remaining time.
+ */
+export interface MessageTurnStateUpdate {
+	type: MessageUpdateType.TurnState;
+	state: TurnStatus;
+	serverNow: number;
+	/** Absolute deadline, present when state === "waiting". */
+	until?: number;
+	reason?: string;
+	error?: string;
 }
 
 // Status
@@ -34,6 +77,8 @@ export interface MessageStatusUpdate {
 	status: MessageUpdateStatus;
 	message?: string;
 	statusCode?: number;
+	/** upstream x-error-code, tells the causes of a 402 apart */
+	errorCode?: string;
 }
 
 // Everything else
@@ -88,13 +133,18 @@ export interface MessageToolCallUpdate extends MessageToolUpdateBase<MessageTool
 	 * uses argumentsRaw when present for byte-accurate arguments instead of
 	 * reserializing the sanitized primitive parameters; the emitted
 	 * tool_call_id is always the
-	 * normalized one regardless (see toToolCallId in prepareFiles.ts), so
+	 * normalized one regardless (see toToolCallId in toolCallId.ts), so
 	 * originalId is captured for future fidelity but not replayed as-is.
 	 * Absent on messages persisted before this field existed, or if the
 	 * provider's response omitted an id.
 	 */
 	originalId?: string;
 	argumentsRaw?: string;
+	/**
+	 * virtual files expanded into this call at dispatch, parameters and argumentsRaw keep
+	 * the reference so this is the only record of which version ran
+	 */
+	fileRefs?: { ref: string; name: string; version: number }[];
 }
 
 export interface MessageToolResultUpdate extends MessageToolUpdateBase<MessageToolUpdateType.Result> {
@@ -150,10 +200,148 @@ export interface MessageFinalAnswerUpdate {
 	type: MessageUpdateType.FinalAnswer;
 	text: string;
 	interrupted: boolean;
+	/** length of the text, stored in its place when the rounds shape holds the answer in content */
+	len?: number;
 }
 export interface MessageRouterMetadataUpdate {
 	type: MessageUpdateType.RouterMetadata;
 	route: string;
 	model: string;
 	provider?: InferenceProvider;
+}
+
+export enum MessageElicitationUpdateType {
+	Request = "request",
+	Resolved = "resolved",
+}
+
+export type MessageElicitationUpdate =
+	MessageElicitationRequestUpdate | MessageElicitationResolvedUpdate;
+
+export interface MessageElicitationRequestUpdate {
+	type: MessageUpdateType.Elicitation;
+	subtype: MessageElicitationUpdateType.Request;
+	request: ElicitationRequestPayload;
+	/**
+	 * Epoch ms. Only a 2025-era prompt has one — it blocks a live request. A 2026-era
+	 * prompt is answered out of band and never expires, so the UI shows no countdown.
+	 */
+	expiresAt?: number;
+	/** Only set when exactly one call was in flight; MCP does not link the two. */
+	toolUuid?: string;
+}
+
+/** Always emitted, even when nobody answered, so replay never shows a form still waiting. */
+export interface MessageElicitationResolvedUpdate {
+	type: MessageUpdateType.Elicitation;
+	subtype: MessageElicitationUpdateType.Resolved;
+	elicitationId: string;
+	action: ElicitationAction;
+	resolution: ElicitationResolution;
+	/** What was submitted, so a reloaded transcript can still show the answers. */
+	content?: Record<string, ElicitationValue>;
+}
+
+/**
+ * Snapshot of the plan after an `update_plan` call. Plain JSON only (no Date):
+ * it travels the JSONL stream and is persisted verbatim in `Message.updates`.
+ * The authoritative current state lives on `Conversation.plan`.
+ */
+export interface MessagePlanUpdate {
+	type: MessageUpdateType.Plan;
+	/** uuid of the update_plan tool call that produced this state. */
+	uuid: string;
+	goal: string;
+	steps: PlanStep[];
+	/** Model-authored one-line changelog for this update. */
+	explanation?: string;
+	version: number;
+}
+
+/**
+ * Snapshot of the ML Assistant compute budget after a reservation, release or
+ * settle. Display-only: the authoritative state lives on `Conversation.mlBudget`
+ * and every transition is a guarded write there. Amounts in integer micro-USD.
+ */
+export interface MessageBudgetUpdate {
+	type: MessageUpdateType.Budget;
+	totalMicroUsd: number;
+	spentMicroUsd: number;
+	/** Sum of open reservation ceilings — held, not yet settled. */
+	reservedMicroUsd: number;
+}
+
+/** a service change as the transcript keeps it, plain json so it streams and persists as is */
+export interface HarnessServiceEvent {
+	serviceId: string;
+	kind: MlServiceKind;
+	jobId: string;
+	handle?: string;
+	name?: string;
+	flavor?: string;
+	from: string;
+	to: string;
+	ranSeconds?: number;
+	pushes?: ServicePush[];
+	/** epoch ms */
+	at: number;
+}
+
+/**
+ * services that ended while the turn was busy, told to the model at a round boundary, the text
+ * is replayed verbatim after the result of afterToolUuid, the last call of the round
+ */
+export interface MessageHarnessEventUpdate {
+	type: MessageUpdateType.HarnessEvent;
+	events: HarnessServiceEvent[];
+	text: string;
+	afterToolUuid: string;
+}
+
+/** sent while the turn was busy, replayed after the result of afterToolUuid like a harness event */
+export interface MessageQueuedInputUpdate {
+	type: MessageUpdateType.QueuedInput;
+	inputs: { id: string; text: string; at: number }[];
+	text: string;
+	afterToolUuid: string;
+}
+
+/** shown to the user in the turn and never sent to the model, like how much of a file it saw */
+export interface MessageNoticeUpdate {
+	type: MessageUpdateType.Notice;
+	text: string;
+}
+
+export enum MessageReviewUpdateType {
+	Request = "request",
+	Resolved = "resolved",
+}
+
+export type MessageReviewUpdate = MessageReviewRequestUpdate | MessageReviewResolvedUpdate;
+
+/** counts only, the records live in mlReviews and never in the conversation document */
+export interface MessageReviewRequestUpdate {
+	type: MessageUpdateType.Review;
+	subtype: MessageReviewUpdateType.Request;
+	reviewId: string;
+	toolUuid: string;
+	title: string;
+	records: number;
+	questions: number;
+	/** label when any question is required, a plain review otherwise */
+	mode: "review" | "label";
+}
+
+export interface MessageReviewResolvedUpdate {
+	type: MessageUpdateType.Review;
+	subtype: MessageReviewUpdateType.Resolved;
+	reviewId: string;
+	answered: number;
+	skipped: number;
+	comments: number;
+	files: MlFileRef[];
+	/** set when the labels were written back to the hub */
+	pushed?: { url: string; pr: boolean };
+	/** set when they were not, `where` is the repo and path they were meant for */
+	pushFailed?: { error: string; where: string };
 }
