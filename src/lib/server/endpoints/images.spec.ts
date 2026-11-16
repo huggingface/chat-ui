@@ -24,6 +24,28 @@ describe("makeImageProcessor", () => {
 		).rejects.toThrow("unsupported image format");
 	});
 
+	it("rejects AVIF content declared as image/png", async () => {
+		const avif = await sharp({
+			create: {
+				width: 2,
+				height: 2,
+				channels: 3,
+				background: { r: 255, g: 0, b: 0 },
+			},
+		})
+			.avif()
+			.toBuffer();
+
+		await expect(
+			imageProcessor({
+				type: "base64",
+				name: "image.png",
+				mime: "image/png",
+				value: avif.toString("base64"),
+			})
+		).rejects.toThrow("unsupported image format");
+	});
+
 	it("accepts PNG content declared as image/png", async () => {
 		const png = await sharp({
 			create: {
