@@ -46,7 +46,7 @@
 		url = initialUrl;
 		headers = initialHeaders.length > 0 ? [...initialHeaders] : [];
 	});
-	let showHeaderValues = $state<Record<number, boolean>>({});
+	let showHeaderValues = $state<boolean[]>([]);
 	let error = $state<string | null>(null);
 
 	// A URL edit re-enables discovery, so a corrected URL isn't added without its OAuth state.
@@ -61,14 +61,12 @@
 
 	function removeHeader(index: number) {
 		headers = headers.filter((_, i) => i !== index);
-		delete showHeaderValues[index];
+		// Shift the flags of the rows below up with them, so a hidden value never inherits "shown".
+		showHeaderValues.splice(index, 1);
 	}
 
 	function toggleHeaderVisibility(index: number) {
-		showHeaderValues = {
-			...showHeaderValues,
-			[index]: !showHeaderValues[index],
-		};
+		showHeaderValues[index] = !showHeaderValues[index];
 	}
 
 	function validate(): boolean {
