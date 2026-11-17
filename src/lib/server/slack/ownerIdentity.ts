@@ -59,15 +59,17 @@ export async function connectedLocals(thread: SlackThread): Promise<App.Locals> 
 /**
  * The Hub refused the owner's stored token before its recorded expiry, as after a revoked
  * authorization. Expiring it makes the next lookup refresh it, or ask the owner to reconnect.
+ * False when the owner has reconnected since the refusal, so the new token is left alone.
  */
-export async function expireOwnerToken(thread: SlackThread): Promise<void> {
-	if (!thread.hfUserId) return;
+export async function expireOwnerToken(thread: SlackThread, refusedAt: Date): Promise<boolean> {
+	if (!thread.hfUserId) return false;
 	const connection = await collections.slackConnections.findOne({
 		_id: connectionKey(thread.teamId, thread.owner, thread.ownerTeamId),
 	});
-	if (!connection?.userId.equals(thread.hfUserId)) return;
+	if (!connection?.userId.equals(thread.hfUserId) || connection.updatedAt > refusedAt) return false;
 	await collections.sessions.updateOne(
 		{ sessionId: connection.sessionId, userId: thread.hfUserId, oauth: { $exists: true } },
 		{ $set: { "oauth.token.expiresAt": new Date() } }
 	);
+	return true;
 }

@@ -299,13 +299,18 @@ export class MlSlackBot {
 	 * A refused login is the owner's to fix, so the reconnect link replaces the failure posts.
 	 * Decided once per failed turn: a later render must not expire a reconnected account.
 	 */
-	private async reconnectOnly(thread: SlackThread, messageId: string): Promise<boolean> {
+	private async reconnectOnly(
+		thread: SlackThread,
+		messageId: string,
+		refusedAt: Date
+	): Promise<boolean> {
 		if (!thread.hfUserId) return false;
 		const _id = `${thread._id}:${messageId}:reconnect`;
 		const decided = await collections.slackDeliveries.findOne({ _id });
 		if (decided) return decided.digest === "sent";
-		await expireOwnerToken(thread);
-		const link = await this.reconnectionLink(thread).catch(() => undefined);
+		const link = (await expireOwnerToken(thread, refusedAt))
+			? await this.reconnectionLink(thread).catch(() => undefined)
+			: undefined;
 		if (link)
 			await this.tell(
 				thread.teamId,
@@ -1292,7 +1297,7 @@ export class MlSlackBot {
 			!question &&
 			state.status === "failed" &&
 			loginRejected(message.updates) &&
-			(await this.reconnectOnly(thread, message.id))
+			(await this.reconnectOnly(thread, message.id, new Date(state.updatedAt)))
 		)
 			return;
 		const previousQuestion = answered

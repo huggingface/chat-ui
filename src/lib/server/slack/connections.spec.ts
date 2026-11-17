@@ -225,7 +225,9 @@ it("asks the owner to reconnect once a token the Hub refused is expired", async 
 	});
 	const thread = await getOrCreateThread("T123", "C123", "7.0", a.slackUser, a.user._id);
 	await connectedLocals(thread);
-	await expireOwnerToken(thread);
+	expect(await expireOwnerToken(thread, new Date(0))).toBe(false);
+	await connectedLocals(thread);
+	expect(await expireOwnerToken(thread, new Date())).toBe(true);
 	await expect(connectedLocals(thread)).rejects.toThrow("reconnect");
 });
 
