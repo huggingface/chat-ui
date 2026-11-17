@@ -13,6 +13,7 @@ import { ML_ASSISTANT_MODE } from "$lib/utils/mlAssistantFlag";
 import { MlServicePoller } from "$lib/server/mlRegistry/poller";
 import { mlServicePollerEnabled } from "$lib/server/mlRegistry/enabled";
 import { adminTokenManager } from "$lib/server/adminToken";
+import { hasSessionOauthKey } from "$lib/server/sessionOauth";
 import { MetricsServer } from "$lib/server/metrics";
 import { getShareThumbnailPng } from "$lib/server/shareThumbnail/shareThumbnail";
 
@@ -31,6 +32,10 @@ export async function initServer(): Promise<void> {
 		logger.warn(
 			"HF_TOKEN is deprecated in favor of OPENAI_API_KEY. Please migrate to OPENAI_API_KEY."
 		);
+	}
+
+	if (config.isHuggingChat && !hasSessionOauthKey()) {
+		throw new Error("SESSION_OAUTH_ENCRYPTION_KEY must be set for HuggingChat");
 	}
 
 	logger.info("Starting server...");

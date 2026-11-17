@@ -23,6 +23,7 @@ import type { Session } from "$lib/types/Session";
 import { base } from "$app/paths";
 import { acquireLock, isDBLocked, releaseLock } from "$lib/migrations/lock";
 import { Semaphores } from "$lib/types/Semaphore";
+import { decryptSessionOauth, encryptSessionOauth } from "$lib/server/sessionOauth";
 
 export interface OIDCSettings {
 	redirectURI: string;
@@ -136,10 +137,15 @@ export async function findUser(
 		return { user: null, invalidateSession: true };
 	}
 
+	let oauth = session.oauth && decryptSessionOauth(session.oauth);
+	if (session.oauth && !oauth) {
+		return { user: null, invalidateSession: true };
+	}
+
 	// Check if OAuth token needs refresh
-	if (session.oauth?.token && session.oauth.refreshToken) {
+	if (oauth?.token && oauth.refreshToken) {
 		// If token expires in less than 5 minutes, refresh it
-		if (differenceInMinutes(session.oauth.token.expiresAt, new Date()) < 5) {
+		if (differenceInMinutes(oauth.token.expiresAt, new Date()) < 5) {
 			const lockKey = `${Semaphores.OAUTH_TOKEN_REFRESH}:${sessionId}`;
 
 			// Acquire lock for token refresh
@@ -149,7 +155,7 @@ export async function findUser(
 					// Attempt to refresh the token
 					const newTokenSet = await refreshOAuthToken(
 						{ redirectURI: `${config.PUBLIC_ORIGIN}${base}/login/callback` },
-						session.oauth.refreshToken,
+						oauth.refreshToken,
 						url
 					);
 
@@ -176,14 +182,14 @@ export async function findUser(
 						}
 					);
 
-					session.oauth = updatedOAuth;
+					oauth = decryptSessionOauth(updatedOAuth);
 				} catch (err) {
 					logger.error(err, "Error during token refresh:");
 					return { user: null, invalidateSession: true };
 				} finally {
 					await releaseLock(lockKey, lockId);
 				}
-			} else if (new Date() > session.oauth.token.expiresAt) {
+			} else if (new Date() > oauth.token.expiresAt) {
 				// If the token has expired, we need to wait for the token refresh to complete
 				let attempts = 0;
 				do {
@@ -195,15 +201,21 @@ export async function findUser(
 				} while (await isDBLocked(lockKey));
 
 				const updatedSession = await collections.sessions.findOne({ sessionId });
-				if (!updatedSession || updatedSession.oauth?.token === session.oauth.token) {
+				if (
+					!updatedSession?.oauth ||
+					updatedSession.oauth.token.expiresAt.getTime() === oauth.token.expiresAt.getTime()
+				) {
 					return { user: null, invalidateSession: true };
 				}
 
-				session.oauth = updatedSession.oauth;
+				oauth = decryptSessionOauth(updatedSession.oauth);
+			}
+			if (!oauth) {
+				return { user: null, invalidateSession: true };
 			}
 		}
-	} else if (session.oauth?.token && !session.oauth.refreshToken) {
-		if (new Date() > session.oauth.token.expiresAt) {
+	} else if (oauth?.token && !oauth.refreshToken) {
+		if (new Date() > oauth.token.expiresAt) {
 			return { user: null, invalidateSession: true };
 		}
 	}
@@ -211,7 +223,7 @@ export async function findUser(
 	return {
 		user: await collections.users.findOne({ _id: session.userId }),
 		invalidateSession: false,
-		oauth: session.oauth,
+		oauth,
 	};
 }
 export const authCondition = (locals: App.Locals) => {
@@ -224,12 +236,13 @@ export const authCondition = (locals: App.Locals) => {
 		: { sessionId: locals.sessionId, userId: { $exists: false } };
 };
 
+/** returns the stored form with tokens encrypted */
 export function tokenSetToSessionOauth(tokenSet: TokenSet): Session["oauth"] {
 	if (!tokenSet.access_token) {
 		return undefined;
 	}
 
-	return {
+	return encryptSessionOauth({
 		token: {
 			value: tokenSet.access_token,
 			expiresAt: tokenSet.expires_at
@@ -237,7 +250,7 @@ export function tokenSetToSessionOauth(tokenSet: TokenSet): Session["oauth"] {
 				: addWeeks(new Date(), 2),
 		},
 		refreshToken: tokenSet.refresh_token || undefined,
-	};
+	});
 }
 
 /**
