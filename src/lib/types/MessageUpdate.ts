@@ -79,6 +79,19 @@ export interface MessageStatusUpdate {
 	statusCode?: number;
 	/** upstream x-error-code, tells the causes of a 402 apart */
 	errorCode?: string;
+	/**
+	 * Set on a KeepAlive while a tool call's arguments are still streaming. A large call
+	 * (a generated file, a long script) can stream for minutes with nothing else to show,
+	 * so this is the only sign the model is still working. Never persisted.
+	 */
+	toolCallDraft?: ToolCallDraft;
+}
+
+export interface ToolCallDraft {
+	/** Absent until the provider has streamed the function name. */
+	name?: string;
+	/** Characters of argument JSON received so far, across every call in the round. */
+	chars: number;
 }
 
 // Everything else
