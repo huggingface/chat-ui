@@ -6,6 +6,7 @@ import {
 	createConnectionLink,
 	connectionKey,
 	connectedLocals,
+	expireOwnerToken,
 	linkedSessionId,
 } from "./connections";
 import { viewerLink, viewerConfig } from "./viewer/auth";
@@ -98,6 +99,7 @@ import {
 	questionModal,
 	readAnswers,
 	visibleText,
+	loginRejected,
 	runFailureText,
 } from "./presentation";
 
@@ -291,6 +293,52 @@ export class MlSlackBot {
 			userTeamId: user.team_id,
 			channel: thread.channel,
 		});
+	}
+
+	/**
+	 * A refused login is the owner's to fix, so the reconnect link replaces the failure posts.
+	 * Decided once per failed turn: a later render must not expire a reconnected account.
+	 */
+	private async reconnectOnly(
+		thread: SlackThread,
+		messageId: string,
+		refusedAt: Date
+	): Promise<boolean> {
+		if (!thread.hfUserId) return false;
+		const _id = `${thread._id}:${messageId}:reconnect`;
+		const decided = await collections.slackDeliveries.findOne({ _id });
+		if (decided) return decided.digest === "sent";
+		const link = (await expireOwnerToken(thread, refusedAt))
+			? await this.reconnectionLink(thread).catch(() => undefined)
+			: undefined;
+		if (link)
+			await this.tell(
+				thread.teamId,
+				thread.channel,
+				thread.owner,
+				`<${link}|Reconnect Hugging Face> to continue, then mention me again.`,
+				thread.threadTs
+			);
+		await collections.slackDeliveries.insertOne({
+			_id,
+			threadId: thread._id,
+			messageId,
+			parts: [],
+			digest: link ? "sent" : "unsent",
+			updatedAt: new Date(),
+		});
+		if (!link) return false;
+		const run = await readRunStatus(this.runOf(thread));
+		const card =
+			run &&
+			(await collections.slackDeliveries.findOneAndDelete({
+				_id: `${thread._id}:status:${run.cardMessageId}`,
+			}));
+		if (card?.parts[0]) {
+			const { client } = await this.slack(thread.teamId);
+			await client.chat.delete({ channel: thread.channel, ts: card.parts[0] }).catch(() => {});
+		}
+		return true;
 	}
 
 	private runOf(thread: SlackThread): RunRef {
@@ -1244,6 +1292,14 @@ export class MlSlackBot {
 			return;
 		}
 		const { message, state, live, question, sharedAnswer: answered } = turn;
+		if (
+			!live.alive &&
+			!question &&
+			state.status === "failed" &&
+			loginRejected(message.updates) &&
+			(await this.reconnectOnly(thread, message.id, new Date(state.updatedAt)))
+		)
+			return;
 		const previousQuestion = answered
 			? await collections.slackDeliveries.findOne({
 					threadId: thread._id,
