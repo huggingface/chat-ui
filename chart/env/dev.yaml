@@ -82,8 +82,10 @@ envVars:
   # and baseten 0/4 at 761k, deepinfra 0/5 at 910k).
   # together and fireworks-ai are billing disabled on the router, so DeepSeek-V4-Pro-0813
   # stays out until another provider passes the probe
+  # Kimi-K3.1-Pro on deepinfra (2026-11-17): 4/4 at 767k, 4/5 at 922k. No other
+  # provider was probed above 300k.
   ML_ASSISTANT_MODELS: >
-    [{"id": "zai-org/GLM-5.3-Flash", "provider": "novita"}, {"id": "moonshotai/Kimi-K3", "provider": "baseten"}, {"id": "zai-org/GLM-5.3", "provider": "novita"}, {"id": "deepseek-ai/DeepSeek-V4-Flash-0731", "provider": "novita"}, {"id": "deepseek-ai/DeepSeek-V4.1-Flash-1017", "provider": "novita"}]
+    [{"id": "zai-org/GLM-5.3-Flash", "provider": "novita"}, {"id": "moonshotai/Kimi-K3", "provider": "baseten"}, {"id": "moonshotai/Kimi-K3.1-Pro", "provider": "deepinfra"}, {"id": "zai-org/GLM-5.3", "provider": "novita"}, {"id": "deepseek-ai/DeepSeek-V4-Flash-0731", "provider": "novita"}, {"id": "deepseek-ai/DeepSeek-V4.1-Flash-1017", "provider": "novita"}]
   MCP_SERVERS: >
     [{"name": "Web Search (Exa)", "url": "https://mcp.exa.ai/mcp?tools=web_search_exa,get_code_context_exa,crawling_exa"}, {"name": "Hugging Face", "url": "https://hf.co/mcp?login"}]
   MCP_TOOL_TIMEOUT_MS: "120000"
@@ -134,6 +136,7 @@ envVars:
       { "id": "thinkingmachines/Inkling-Small", "description": "Compact multimodal 276B MoE with 12B active params and adjustable reasoning effort.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "NousResearch/Hermes-3-Llama-3.1-70B", "description": "Steerable 70B Llama fine-tune for roleplay, agents, and function calling.", "supportsArtifacts": true },
       { "id": "Qwen/Qwen3-30B-A3B", "description": "Efficient hybrid 30B MoE with 3B active params and switchable thinking mode." },
+      { "id": "moonshotai/Kimi-K3.1-Pro", "description": "2.8T MoE post-trained from Kimi K3 for agentic work, with native vision and 1M context.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "moonshotai/Kimi-K3", "description": "2.8T MoE with native vision, 1M context, and always-on thinking.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "tencent/Hy3", "description": "295B MoE for deep reasoning, agentic coding, and 256K context.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "XiaomiMiMo/MiMo-V2.5", "description": "310B omnimodal MoE handling text, image, video, and audio at 1M context.", "supportsArtifacts": true },
