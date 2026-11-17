@@ -27,6 +27,7 @@
 	import { browser } from "$app/environment";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 	import { useAPIClient, handleResponse } from "$lib/APIClient";
+	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { enabledServersCount } from "$lib/stores/mcpServers";
 	import { isPro } from "$lib/stores/isPro";
@@ -35,6 +36,7 @@
 
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
+	const convsStore = useConversationsStore();
 
 	interface Props {
 		conversations: ConvSidebar[];
@@ -45,7 +47,7 @@
 	}
 
 	let {
-		conversations = $bindable(),
+		conversations,
 		user,
 		p = $bindable(0),
 		ondeleteConversation,
@@ -88,22 +90,25 @@
 	const nModels: number = page.data.models.filter((el: Model) => !el.unlisted).length;
 
 	async function handleVisible() {
-		p++;
-		const newConvs = await client.conversations
+		p = convsStore.nextPage;
+		const res = await client.conversations
 			.get({
 				query: {
 					p,
 				},
 			})
 			.then(handleResponse)
-			.then((r) => r.conversations)
-			.catch((): ConvSidebar[] => []);
+			.catch(() => ({ conversations: [] as ConvSidebar[], hasMore: false }));
+		const newConvs = res.conversations;
 
-		if (newConvs.length === 0) {
-			hasMore = false;
-		}
+		// Re-requesting a partly loaded last page returns rows that are all known, so stop
+		// on the server's flag rather than on an empty page.
+		hasMore = res.hasMore;
 
-		conversations = [...conversations, ...newConvs];
+		// Older pages go into the shared store, not a local copy of the prop: a local
+		// copy is dropped as soon as the store list is replaced (delete, new chat) and
+		// never sees a rename.
+		convsStore.append(newConvs);
 	}
 
 	$effect(() => {
@@ -111,6 +116,7 @@
 			// reset p to 0 if there's only one page of content
 			// that would be caused by a data loading invalidation
 			p = 0;
+			hasMore = true;
 		}
 	});
 

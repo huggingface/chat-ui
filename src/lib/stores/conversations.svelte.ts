@@ -24,6 +24,7 @@ import { browser } from "$app/environment";
 import { getContext, setContext } from "svelte";
 import type { ConvSidebar } from "$lib/types/ConvSidebar";
 import { useAPIClient, handleResponse } from "$lib/APIClient";
+import { CONV_NUM_PER_PAGE } from "$lib/constants/pagination";
 
 export const CONVERSATIONS_CONTEXT_KEY = "conversationsStore";
 
@@ -35,7 +36,7 @@ interface ConversationListItem {
 	mlAssistant?: boolean;
 }
 
-class ConversationsStore {
+export class ConversationsStore {
 	#list = $state<ConvSidebar[]>([]);
 
 	get list(): ConvSidebar[] {
@@ -65,6 +66,27 @@ class ConversationsStore {
 	/** Prepend a new conversation to the top of the list. */
 	prepend(conv: ConvSidebar): void {
 		this.#list = [conv, ...this.#list];
+	}
+
+	/**
+	 * Append a page of older conversations loaded by the sidebar's infinite scroll.
+	 * Skips ids already in the list: pages shift when a conversation is created or
+	 * deleted, and the mobile and desktop sidebars paginate independently.
+	 */
+	append(conversations: ConvSidebar[]): void {
+		const known = new Set(this.#list.map((c) => String(c.id)));
+		const older = conversations.filter((c) => !known.has(String(c.id)));
+		if (older.length) this.#list = [...this.#list, ...older];
+	}
+
+	/**
+	 * The page the sidebar's infinite scroll should request next, from the rows already
+	 * loaded rather than a page counter: the API pages by offset, so after a delete a
+	 * counter would skip the row that moved up into the page already loaded. Refetching
+	 * from the loaded row count picks it up, and append() drops the rows already listed.
+	 */
+	get nextPage(): number {
+		return Math.floor(this.#list.length / CONV_NUM_PER_PAGE);
 	}
 
 	/**
