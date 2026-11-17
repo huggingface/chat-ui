@@ -95,7 +95,7 @@ export function runFailureText(updates: MessageUpdate[] = []): string {
 			? (paymentErrorNotice(status.errorCode) ??
 				"Your Hugging Face account is out of inference credits. Add credits, then retry.")
 			: status?.statusCode === 401
-				? "Your Hugging Face login is no longer valid. Use the reconnect link I sent you, or mention me for a new one."
+				? "Your Hugging Face login is no longer valid. Mention me again to reconnect."
 				: status?.statusCode === 429
 					? "Hugging Face rate-limited this request. Wait a minute, then retry."
 					: undefined;

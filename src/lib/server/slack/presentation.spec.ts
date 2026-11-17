@@ -401,7 +401,7 @@ describe("runFailureText", () => {
 			"The run failed. Your Hugging Face account is out of inference credits. Add credits, then retry."
 		);
 		expect(runFailureText(failed(402, "PaymentMethodRequired"))).toContain("payment method");
-		expect(runFailureText(failed(401))).toContain("reconnect link");
+		expect(runFailureText(failed(401))).toContain("Mention me again to reconnect");
 		expect(loginRejected(failed(401))).toBe(true);
 		expect(loginRejected(failed(402))).toBe(false);
 		expect(loginRejected()).toBe(false);
