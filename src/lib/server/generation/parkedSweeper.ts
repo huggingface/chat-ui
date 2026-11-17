@@ -38,6 +38,7 @@ import { compressUpdatesForStorage, messageForStorage } from "./compressUpdates"
 import { offloadStoredToolImages } from "$lib/server/files/toolImages";
 import { takeQueuedInputs } from "$lib/server/queuedInputs/deliver";
 import { restoreRunningShape } from "$lib/utils/messageShape";
+import { decryptSessionOauth } from "$lib/server/sessionOauth";
 
 const SWEEP_BATCH = 5;
 /** A row this many attempts deep is not going to resume; stop burning turns on it. */
@@ -300,7 +301,7 @@ export async function rebuildIdentity(park: Pick<ParkedCall, "userId" | "session
 			? await collections.sessions.findOne({ sessionId: park.sessionId })
 			: null;
 
-	const token = session?.oauth?.token;
+	const token = session?.oauth ? decryptSessionOauth(session.oauth)?.token : undefined;
 	const tokenExpired = Boolean(token?.expiresAt && token.expiresAt.getTime() <= Date.now());
 	const settings = await collections.settings.findOne(
 		park.userId ? { userId: park.userId } : { sessionId: park.sessionId ?? "" }
