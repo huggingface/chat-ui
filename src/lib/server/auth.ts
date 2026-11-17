@@ -300,7 +300,10 @@ async function getOIDCClient(settings: OIDCSettings, url: URL): Promise<BaseClie
 
 	const client_config: ConstructorParameters<typeof issuer.Client>[0] = {
 		client_id: OIDConfig.CLIENT_ID,
-		client_secret: OIDConfig.CLIENT_SECRET,
+		// openid-client sends an empty basic auth password when the secret is empty
+		...(OIDConfig.CLIENT_SECRET
+			? { client_secret: OIDConfig.CLIENT_SECRET }
+			: { token_endpoint_auth_method: "none" }),
 		redirect_uris: [settings.redirectURI],
 		response_types: ["code"],
 		[custom.clock_tolerance]: OIDConfig.TOLERANCE || undefined,
