@@ -6,6 +6,7 @@ import {
 	createConnectionLink,
 	readConnectionLink,
 	connectedLocals,
+	expireOwnerToken,
 	linkedSessionId,
 	chatLink,
 } from "./connections";
@@ -212,6 +213,19 @@ it("requires old unverified account connections to reconnect", async () => {
 		updatedAt: new Date(),
 	});
 	const thread = await getOrCreateThread("T123", "C123", "5.0", "U123", a.user._id);
+	await expect(connectedLocals(thread)).rejects.toThrow("reconnect");
+});
+
+it("asks the owner to reconnect once a token the Hub refused is expired", async () => {
+	const a = await account();
+	await connectAccount(a.ticket, a.user, a.session.sessionId, {
+		team: "T123",
+		user: a.slackUser,
+		expires: Date.now() + 60000,
+	});
+	const thread = await getOrCreateThread("T123", "C123", "7.0", a.slackUser, a.user._id);
+	await connectedLocals(thread);
+	await expireOwnerToken(thread);
 	await expect(connectedLocals(thread)).rejects.toThrow("reconnect");
 });
 

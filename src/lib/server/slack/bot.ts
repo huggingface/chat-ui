@@ -6,6 +6,7 @@ import {
 	createConnectionLink,
 	connectionKey,
 	connectedLocals,
+	expireOwnerToken,
 	linkedSessionId,
 } from "./connections";
 import { viewerLink, viewerConfig } from "./viewer/auth";
@@ -98,6 +99,7 @@ import {
 	questionModal,
 	readAnswers,
 	visibleText,
+	loginRejected,
 	runFailureText,
 } from "./presentation";
 
@@ -291,6 +293,21 @@ export class MlSlackBot {
 			userTeamId: user.team_id,
 			channel: thread.channel,
 		});
+	}
+
+	/** once per failed turn, so a reconnected account is not expired again by a later render */
+	private async offerReconnect(thread: SlackThread): Promise<void> {
+		if (!thread.hfUserId) return;
+		await expireOwnerToken(thread);
+		const link = await this.reconnectionLink(thread);
+		if (link)
+			await this.tell(
+				thread.teamId,
+				thread.channel,
+				thread.owner,
+				`<${link}|Reconnect Hugging Face> to continue, then retry.`,
+				thread.threadTs
+			);
 	}
 
 	private runOf(thread: SlackThread): RunRef {
@@ -1393,6 +1410,10 @@ export class MlSlackBot {
 					updatedAt: new Date(),
 				};
 				await collections.slackDeliveries.insertOne(delivery);
+				if (!question && state.status === "failed" && loginRejected(message.updates))
+					await this.offerReconnect(thread).catch(() =>
+						logger.warn("[slack] Could not offer a reconnect link")
+					);
 			}
 			const parts = chunks(text);
 			const mentions = await this.mentionable(thread, text);

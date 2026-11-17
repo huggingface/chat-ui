@@ -14,6 +14,7 @@ import {
 	inlineField,
 	createdSpaceLinks,
 	chunks,
+	loginRejected,
 	runFailureText,
 	questionModal,
 	readAnswers,
@@ -400,7 +401,10 @@ describe("runFailureText", () => {
 			"The run failed. Your Hugging Face account is out of inference credits. Add credits, then retry."
 		);
 		expect(runFailureText(failed(402, "PaymentMethodRequired"))).toContain("payment method");
-		expect(runFailureText(failed(401))).toContain("Sign in to HuggingChat again");
+		expect(runFailureText(failed(401))).toContain("reconnect link");
+		expect(loginRejected(failed(401))).toBe(true);
+		expect(loginRejected(failed(402))).toBe(false);
+		expect(loginRejected()).toBe(false);
 		expect(runFailureText(failed(429))).toContain("rate-limited");
 		expect(runFailureText(failed(500))).toBe("The run failed. You can resume it below.");
 		expect(runFailureText()).toBe("The run failed. You can resume it below.");
