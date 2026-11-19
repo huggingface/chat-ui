@@ -2,6 +2,12 @@ import { createRepo, uploadFiles } from "@huggingface/hub";
 import { config } from "$lib/server/config";
 import { logger } from "$lib/server/logger";
 import type { OpenAiTool } from "$lib/server/mcp/tools";
+import {
+	fetchGradioEndpoints,
+	lookupSpace,
+	pickGradioEndpoint,
+	type GradioIo,
+} from "$lib/server/hubSpaces";
 import { knownArtefactUris, recordArtefact } from "$lib/server/mlRegistry/store";
 import type { BuiltinTool, BuiltinToolContext } from "./types";
 
@@ -364,17 +370,6 @@ async function checkModel(
 	};
 }
 
-/** Endpoints a Gradio app wires to its own UI events rather than offers as an API. */
-const UTILITY_ENDPOINT = /^\/(on|handle|update|prepare|load|clear|reset)_/;
-
-type GradioIo = {
-	label?: string;
-	parameter_name?: string;
-	component?: string;
-	parameter_has_default?: boolean;
-	parameter_default?: unknown;
-};
-
 const COMPONENT_PORTS: Record<string, string> = {
 	textbox: "text",
 	dropdown: "text",
@@ -405,36 +400,19 @@ async function checkSpace(
 	accessToken: string,
 	signal?: AbortSignal
 ): Promise<string | Operator> {
-	let named: Record<string, { parameters?: GradioIo[]; returns?: GradioIo[] }>;
-	try {
-		const response = await fetch(`https://huggingface.co/api/spaces/${space}`, {
-			headers: { Authorization: `Bearer ${accessToken}` },
-			signal,
-		});
-		if (!response.ok) return `${space} does not resolve on the Hub (${response.status}).`;
-		const info: { sdk?: string; host?: string; runtime?: { stage?: string } } =
-			await response.json();
-		if (info.sdk !== "gradio") {
-			return `${space} is a ${info.sdk ?? "non-Gradio"} Space; a workflow can only call a Gradio Space.`;
-		}
-		if (info.runtime?.stage !== "RUNNING" || !info.host) {
-			return `${space} is ${info.runtime?.stage ?? "not running"}, so a workflow cannot call it — pick a running Space.`;
-		}
-		// No token: the Space's own code would read it.
-		const api = await fetch(`${info.host}/gradio_api/info`, {
-			signal: AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(15_000)]),
-		});
-		if (!api.ok) return `${space} does not expose a Gradio API (${api.status}).`;
-		named = (await api.json()).named_endpoints ?? {};
-	} catch (err) {
-		return `Could not look up ${space}: ${String(err)}`;
+	const info = await lookupSpace(space, accessToken, signal);
+	if (typeof info === "string") return info;
+	if (info.sdk !== "gradio") {
+		return `${space} is a ${info.sdk ?? "non-Gradio"} Space; a workflow can only call a Gradio Space.`;
 	}
-	// Utility endpoints are only skipped when picking a default; one named explicitly is used.
-	const names = Object.keys(named).filter((name) => !UTILITY_ENDPOINT.test(name));
-	const name = endpoint ?? (names.includes("/predict") ? "/predict" : names[0]);
-	if (!name || !Object.hasOwn(named, name)) {
-		return `${space} has no ${endpoint ?? "callable"} endpoint${names.length ? ` — it has ${names.join(", ")}` : ""}.`;
+	if (info.stage !== "RUNNING" || !info.host) {
+		return `${space} is ${info.stage ?? "not running"}, so a workflow cannot call it — pick a running Space.`;
 	}
+	// No token: the Space's own code would read it.
+	const named = await fetchGradioEndpoints(info, undefined, signal);
+	if (typeof named === "string") return named;
+	const name = pickGradioEndpoint(space, named, endpoint);
+	if (typeof name !== "string") return name.error;
 	const { parameters = [], returns = [] } = named[name];
 	return {
 		kind: "space",
