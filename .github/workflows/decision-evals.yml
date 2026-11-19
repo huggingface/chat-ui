@@ -54,7 +54,7 @@ jobs:
           fi
 
       - name: Checkout the PR
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           path: head
@@ -82,7 +82,7 @@ jobs:
           gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "<!-- decision-evals -->
           Decision evals skipped: the merge-base (\`${{ steps.base.outputs.sha }}\`) predates the eval harness, so there is nothing to compare against."
 
-      - uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: steps.base.outputs.ready == 'true'
         with:
           node-version-file: head/.nvmrc
@@ -94,7 +94,7 @@ jobs:
       # the app starts an in-memory MongoDB at import; two arms fetching its binary at once race
       - name: Cache mongodb-memory-server binaries
         if: steps.base.outputs.ready == 'true'
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}
