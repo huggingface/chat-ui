@@ -91,6 +91,20 @@ describe("after-job-failure", () => {
 		).toEqual({ label: "resubmit", pass: false });
 	});
 
+	it("compares nested v-file paths by script basename", () => {
+		const other = job({ flavor: "cpu-basic", script: "v-file://scripts/strip.py@v2" });
+		expect(
+			label("after-job-failure", calls(edit("x"), other), { failedScript: "train.py" })
+		).toEqual({ label: "different-job", pass: null });
+		expect(
+			label(
+				"after-job-failure",
+				calls(job({ flavor: "a10g-small", script: "v-file://scripts/train.py" })),
+				{ failedScript: "train.py" }
+			)
+		).toEqual({ label: "resubmit", pass: false });
+	});
+
 	it("does not judge reading the logs", () => {
 		expect(
 			label("after-job-failure", calls({ name: "check_job", args: { job_id: "x", task: "why" } }))
