@@ -24,14 +24,14 @@ import { toLegacyShape } from "$lib/utils/messageShape";
 const REASONING_BLOCK_REGEX = /<think>[\s\S]*?(?:<\/think>|$)/g;
 
 // Cache models at module level to avoid redundant dynamic imports on every request
-let cachedModels: ProcessedModel[] | undefined;
+let cachedRoutingModels: ProcessedModel[] | undefined;
 
-async function getModels(): Promise<ProcessedModel[]> {
-	if (!cachedModels) {
+async function getRoutingModels(): Promise<ProcessedModel[]> {
+	if (!cachedRoutingModels) {
 		const mod = await import("../models");
-		cachedModels = (mod as { models: ProcessedModel[] }).models;
+		cachedRoutingModels = mod.routingModels;
 	}
-	return cachedModels;
+	return cachedRoutingModels;
 }
 
 /**
@@ -133,7 +133,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 			// Try to use the real candidate model config if present in chat-ui's model list
 			let modelForCall: ProcessedModel | undefined;
 			try {
-				const all = await getModels();
+				const all = await getRoutingModels();
 				modelForCall = all?.find((m) => m.id === candidateModelId || m.name === candidateModelId);
 			} catch (e) {
 				logger.warn({ err: String(e) }, "[router] failed to load models for candidate lookup");
@@ -179,7 +179,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		if (routerMultimodalEnabled && hasImageInput) {
 			let multimodalCandidate: string | undefined;
 			try {
-				const all = await getModels();
+				const all = await getRoutingModels();
 				multimodalCandidate = getConfiguredMultimodalModelId(all);
 			} catch (e) {
 				logger.warn({ err: String(e) }, "[router] failed to load models for multimodal lookup");
@@ -217,7 +217,7 @@ export async function makeRouterEndpoint(routerModel: ProcessedModel): Promise<E
 		if (routerToolsEnabled && hasToolsActive) {
 			let toolsModel: ProcessedModel | undefined;
 			try {
-				const all = await getModels();
+				const all = await getRoutingModels();
 				toolsModel = pickToolsCapableModel(all);
 			} catch (e) {
 				logger.warn({ err: String(e) }, "[router] failed to load models for tools lookup");
