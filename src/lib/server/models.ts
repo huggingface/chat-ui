@@ -9,6 +9,7 @@ import { setMlAssistantCatalog } from "./mlAssistantModels";
 import { logger } from "$lib/server/logger";
 import { preservesReasoningByDefault } from "$lib/server/reasoningPolicy";
 import { makeRouterEndpoint } from "$lib/server/router/endpoint";
+import { dedupeById } from "$lib/utils/dedupeById";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -378,7 +379,9 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 			(config.LLM_ROUTER_ENABLE_MULTIMODAL || "").toLowerCase() === "true";
 		const routerToolsEnabled = (config.LLM_ROUTER_ENABLE_TOOLS || "").toLowerCase() === "true";
 
-		let decorated = builtModels as ProcessedModel[];
+		// Azure and some OpenAI-compatible catalogs repeat an id. {#each} keyed by
+		// model.id throws each_key_duplicate and the models/settings pages go blank.
+		let decorated = dedupeById(builtModels as ProcessedModel[]);
 
 		if (routerRoutesPath) {
 			// Build a minimal model config for the alias
@@ -430,8 +433,8 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 				getEndpoint: async (): Promise<Endpoint> => makeRouterEndpoint(aliasModel),
 			} as ProcessedModel;
 
-			// Put alias first
-			decorated = [aliasModel, ...decorated];
+			// Put alias first. Drop a catalog row that already uses the alias id.
+			decorated = [aliasModel, ...decorated.filter((model) => model.id !== aliasModel.id)];
 		}
 
 		return decorated;
