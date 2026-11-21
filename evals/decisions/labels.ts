@@ -194,7 +194,6 @@ export function scriptName(call: ActionCall): string | undefined {
 }
 
 const basename = (path: string) => path.split("/").pop()!;
-}
 
 export function isJobSubmit(c: ActionCall): boolean {
 	if (c.name !== "hf_jobs") return false;
