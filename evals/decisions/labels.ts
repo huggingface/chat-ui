@@ -182,7 +182,12 @@ function isRerun(c: ActionCall): boolean {
 }
 
 export function scriptName(call: ActionCall): string | undefined {
-	return JSON.stringify(call.args).match(/v-file:\/\/([\w.-]+?)(?:@v\d+)?"/)?.[1];
+	// Match nested v-file paths and return the basename so the after-job-failure
+	// comparison against context.failedScript is path-insensitive.
+	return JSON.stringify(call.args)
+		.match(/v-file:\/\/([\w./-]+?)(?:@v\d+)?"/)?.[1]
+		?.split("/")
+		.pop();
 }
 
 export function isJobSubmit(c: ActionCall): boolean {
