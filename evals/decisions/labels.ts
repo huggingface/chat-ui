@@ -83,7 +83,12 @@ function labelAfterJobFailure(
 ): { label: string; pass: boolean | null } {
 	if (calls.some(isSandboxWork)) return { label: "reproduce-in-sandbox", pass: true };
 	const job = calls.find(isJobSubmit);
-	if (job && context.failedScript && scriptName(job) && scriptName(job) !== context.failedScript) {
+	if (
+		job &&
+		context.failedScript &&
+		scriptName(job) &&
+		basename(scriptName(job)!) !== basename(context.failedScript)
+	) {
 		return { label: "different-job", pass: null };
 	}
 	if (job) {
@@ -182,12 +187,13 @@ function isRerun(c: ActionCall): boolean {
 }
 
 export function scriptName(call: ActionCall): string | undefined {
-	// Match nested v-file paths and return the basename so the after-job-failure
-	// comparison against context.failedScript is path-insensitive.
-	return JSON.stringify(call.args)
-		.match(/v-file:\/\/([\w./-]+?)(?:@v\d+)?"/)?.[1]
-		?.split("/")
-		.pop();
+	// Return the full v-file path (directories included) so first-gpu-job's
+	// sandboxedScript check keeps distinct same-named files distinct; only
+	// after-job-failure compares basenames via basename().
+	return JSON.stringify(call.args).match(/v-file:\/\/([\w./-]+?)(?:@v\d+)?"/)?.[1];
+}
+
+const basename = (path: string) => path.split("/").pop()!;
 }
 
 export function isJobSubmit(c: ActionCall): boolean {
