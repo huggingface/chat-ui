@@ -103,6 +103,9 @@ export function parseMarkdownIntoBlocks(markdown: string): string[] {
 	}
 
 	const tokens = Lexer.lex(markdown, { gfm: true });
+	// The lexer stores reference definitions on the token list, outside token.raw.
+	// Keep them with the paragraphs that use them when caching independent blocks.
+	if (Object.keys(tokens.links).length > 0) return [markdown];
 
 	// Post-process to merge consecutive blocks that belong together
 	const mergedBlocks: string[] = [];

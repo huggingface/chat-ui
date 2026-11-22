@@ -366,11 +366,8 @@ function sanitizeHtmlForMultimedia(html: string): string {
 	return sanitized;
 }
 
-function createMarkedInstance(sources: SimpleSource[]): Marked {
+function createMarkedInstance(): Marked {
 	return new Marked({
-		hooks: {
-			postprocess: (html) => addInlineCitations(html, sources),
-		},
 		extensions: [katexBlockExtension, katexInlineExtension],
 		renderer: {
 			link: (href, title, text) => {
@@ -461,33 +458,11 @@ function cacheKey(index: number, blockContent: string, sources: SimpleSource[]) 
 }
 
 export async function processTokens(content: string, sources: SimpleSource[]): Promise<Token[]> {
-	const marked = createMarkedInstance(sources);
-	const tokens = marked.lexer(content);
-
-	const processedTokens = await Promise.all(
-		tokens.map(async (token) => {
-			if (token.type === "code") {
-				return {
-					type: "code" as const,
-					lang: token.lang,
-					code: highlightCode(token.text, token.lang),
-					rawCode: token.text,
-					isClosed: isFencedBlockClosed(token.raw ?? ""),
-				};
-			} else {
-				return {
-					type: "text" as const,
-					html: marked.parse(token.raw),
-				};
-			}
-		})
-	);
-
-	return processedTokens;
+	return processTokensSync(content, sources);
 }
 
 export function processTokensSync(content: string, sources: SimpleSource[]): Token[] {
-	const marked = createMarkedInstance(sources);
+	const marked = createMarkedInstance();
 	const tokens = marked.lexer(content);
 	return tokens.map((token) => {
 		if (token.type === "code") {
@@ -499,7 +474,7 @@ export function processTokensSync(content: string, sources: SimpleSource[]): Tok
 				isClosed: isFencedBlockClosed(token.raw ?? ""),
 			};
 		}
-		return { type: "text" as const, html: marked.parse(token.raw) };
+		return { type: "text" as const, html: addInlineCitations(marked.parser([token]), sources) };
 	});
 }
 
