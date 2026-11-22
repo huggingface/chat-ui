@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { fallbackBlocks, highlightCode, processBlocks, processBlocksSync, processTokensSync } from "./marked";
+import {
+	fallbackBlocks,
+	highlightCode,
+	processBlocks,
+	processBlocksSync,
+	processTokensSync,
+} from "./marked";
 
 function renderHtml(md: string): string {
 	const tokens = processTokensSync(md, []);
