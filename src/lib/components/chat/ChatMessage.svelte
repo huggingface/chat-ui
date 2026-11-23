@@ -25,7 +25,7 @@
 	import OpenReasoningResults from "./OpenReasoningResults.svelte";
 	import Alternatives from "./Alternatives.svelte";
 	import MessageAvatar from "./MessageAvatar.svelte";
-	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
+	import { providerHubOrg } from "$lib/utils/providerHubOrg";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import ToolUpdate from "./ToolUpdate.svelte";
 	import TurnWaitBanner from "./TurnWaitBanner.svelte";
@@ -564,21 +564,26 @@
 							{/if}
 						{/if}
 						{#if message.routerMetadata.provider}
-							{@const hubOrg = PROVIDERS_HUB_ORGS[message.routerMetadata.provider]}
+							{@const hubOrg = providerHubOrg(message.routerMetadata.provider)}
 							<span class="text-gray-500 @max-xl:hidden">via</span>
-							<a
-								target="_blank"
-								href="https://huggingface.co/{hubOrg}"
-								class="flex items-center gap-1 truncate rounded-sm bg-gray-100 px-1 font-mono hover:text-gray-500 @max-xl:hidden @xl:py-px dark:bg-gray-800 dark:hover:text-gray-300"
+							<svelte:element
+								this={hubOrg ? "a" : "span"}
+								target={hubOrg ? "_blank" : undefined}
+								href={hubOrg ? `https://huggingface.co/${hubOrg}` : undefined}
+								class="flex items-center gap-1 truncate rounded-sm bg-gray-100 px-1 font-mono @max-xl:hidden @xl:py-px dark:bg-gray-800 {hubOrg
+									? 'hover:text-gray-500 dark:hover:text-gray-300'
+									: ''}"
 							>
-								<img
-									src="https://huggingface.co/api/avatars/{hubOrg}"
-									alt="{message.routerMetadata.provider} logo"
-									class="size-2.5 flex-none rounded-xs"
-									onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
-								/>
+								{#if hubOrg}
+									<img
+										src="https://huggingface.co/api/avatars/{hubOrg}"
+										alt="{message.routerMetadata.provider} logo"
+										class="size-2.5 flex-none rounded-xs"
+										onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+									/>
+								{/if}
 								{message.routerMetadata.provider}
-							</a>
+							</svelte:element>
 						{/if}
 					</div>
 				{/if}
