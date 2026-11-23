@@ -55,6 +55,10 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 		slackThreadUrl: slackThread
 			? `https://app.slack.com/client/${encodeURIComponent(slackThread.teamId)}/${encodeURIComponent(slackThread.channel)}/thread/${encodeURIComponent(slackThread.channel)}-${encodeURIComponent(slackThread.threadTs)}`
 			: undefined,
+		automationRepoUrl:
+			"managedBy" in conversation && conversation.managedBy?.kind === "automation"
+				? conversation.managedBy.continueUrl
+				: undefined,
 		messages: conversation.messages,
 		title: conversation.title,
 		model: conversation.model,

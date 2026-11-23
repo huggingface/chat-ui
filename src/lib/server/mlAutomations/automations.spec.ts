@@ -9,7 +9,7 @@ import type { User } from "$lib/types/User";
 import { automationSessionId, sealToken } from "./identity";
 import { automationPrompt, parseHubEvent } from "./event";
 import { receiveDelivery } from "./receive";
-import { createAutomation, hashSecret } from "./store";
+import { createAutomation, deleteAutomation, hashSecret, stopAutomationRun } from "./store";
 
 const mocks = vi.hoisted(() => ({
 	create: vi.fn(),
@@ -102,6 +102,7 @@ async function seed(
 		userId: user._id,
 		name: "Eval on push",
 		instruction: "Run the eval script on the new revision.",
+		watched: [{ type: "model", name: "alice/model" }],
 		budgetUsd: 5,
 		maxRunsPerDay: 10,
 		billTo: { organization: "automation-org" },
@@ -303,37 +304,166 @@ describe("automation identity on resume", () => {
 });
 
 describe("automation setup", () => {
-	const whoami = (id: string, type = "access_token") =>
+	const PUBLIC = "https://chat.example.com";
+	type Call = { url: string; method: string; body?: unknown };
+	let calls: Call[];
+	function hub(opts: { id: string; type?: string; create?: Response }) {
+		calls = [];
 		vi.stubGlobal(
 			"fetch",
-			vi.fn(async () => Response.json({ id, auth: { type } }))
+			vi.fn(async (url: string, init?: RequestInit) => {
+				calls.push({
+					url,
+					method: init?.method ?? "GET",
+					body: init?.body ? JSON.parse(String(init.body)) : undefined,
+				});
+				if (url.endsWith("/api/whoami-v2"))
+					return Response.json({ id: opts.id, auth: { type: opts.type ?? "access_token" } });
+				if (url.endsWith("/api/settings/webhooks") && init?.method === "POST")
+					return opts.create ?? Response.json({ webhook: { id: "wh1" } });
+				if (url.includes("/api/settings/webhooks/") && init?.method === "DELETE")
+					return new Response(null, { status: 200 });
+				throw new Error(`unexpected fetch ${url}`);
+			})
 		);
+	}
 	const input = {
 		name: "Eval on push",
 		instruction: "Run the eval.",
+		watched: [{ type: "model" as const, name: "alice/model" }],
 		budgetUsd: 5,
 		token: TOKEN,
 	};
 
-	it("keeps only the hash of the secret it hands back", async () => {
+	it("registers the hub webhook with the secret and keeps only its hash", async () => {
 		const { user } = await createTestUser();
-		whoami(user.hfUserId);
-		const { automation, secret } = await createAutomation({ user }, input);
+		hub({ id: user.hfUserId });
+		const created = await createAutomation({ user }, input, PUBLIC);
 
-		const stored = await collections.mlAutomations.findOne({ _id: automation._id });
-		expect(stored?.secretHash).toBe(hashSecret(secret));
-		expect(JSON.stringify(automation)).not.toContain(TOKEN);
-		expect(JSON.stringify(automation)).not.toContain(secret);
+		expect(created.manual).toBeUndefined();
+		const register = calls.find((call) => call.method === "POST");
+		const body = register?.body as {
+			secret: string;
+			url: string;
+			watched: unknown;
+			domains: string[];
+		};
+		expect(body).toMatchObject({
+			url: `${PUBLIC}/api/v2/ml-automations/${created.automation._id.toHexString()}/webhook`,
+			watched: input.watched,
+			domains: ["repo"],
+		});
+		const stored = await collections.mlAutomations.findOne({ _id: created.automation._id });
+		expect(stored?.webhookId).toBe("wh1");
+		expect(stored?.secretHash).toBe(hashSecret(body.secret));
+		expect(JSON.stringify(created)).not.toContain(TOKEN);
+		expect(JSON.stringify(created)).not.toContain(body.secret);
 		expect(stored?.maxRunsPerDay).toBe(10);
+	});
+
+	it("hands the url and secret back when the hub cannot reach this server", async () => {
+		const { user } = await createTestUser();
+		hub({ id: user.hfUserId });
+		const created = await createAutomation({ user }, input, "http://localhost:5173");
+
+		expect(calls.some((call) => call.method === "POST")).toBe(false);
+		const id = created.automation._id.toHexString();
+		expect(created.manual?.url).toBe(`http://localhost:5173/api/v2/ml-automations/${id}/webhook`);
+		const stored = await collections.mlAutomations.findOne({ _id: created.automation._id });
+		expect(stored?.secretHash).toBe(hashSecret(created.manual?.secret ?? ""));
+		expect(stored?.webhookId).toBeUndefined();
+	});
+
+	it("stores nothing when the hub refuses the webhook", async () => {
+		const { user } = await createTestUser();
+		hub({ id: user.hfUserId, create: new Response("forbidden", { status: 403 }) });
+		await expect(createAutomation({ user }, input, PUBLIC)).rejects.toMatchObject({
+			status: 502,
+			body: { message: expect.stringContaining("manage webhooks") },
+		});
+		expect(await collections.mlAutomations.countDocuments({})).toBe(0);
 	});
 
 	it("refuses a token of another account or one that is not a user token", async () => {
 		const { user } = await createTestUser();
-		whoami("someone-else");
-		await expect(createAutomation({ user }, input)).rejects.toMatchObject({ status: 400 });
-		whoami(user.hfUserId, "oauth");
-		await expect(createAutomation({ user }, input)).rejects.toMatchObject({ status: 400 });
+		hub({ id: "someone-else" });
+		await expect(createAutomation({ user }, input, PUBLIC)).rejects.toMatchObject({ status: 400 });
+		hub({ id: user.hfUserId, type: "oauth" });
+		await expect(createAutomation({ user }, input, PUBLIC)).rejects.toMatchObject({ status: 400 });
 		expect(await collections.mlAutomations.countDocuments({})).toBe(0);
+		expect(calls.some((call) => call.method === "POST")).toBe(false);
+	});
+
+	it("deletes the hub webhook with the automation", async () => {
+		const { user } = await createTestUser();
+		hub({ id: user.hfUserId });
+		const { automation } = await createAutomation({ user }, input, PUBLIC);
+
+		expect(await deleteAutomation(new ObjectId(), automation._id)).toBe(false);
+		expect(await deleteAutomation(user._id, automation._id)).toBe(true);
+		expect(calls.at(-1)).toMatchObject({
+			method: "DELETE",
+			url: "https://huggingface.co/api/settings/webhooks/wh1",
+		});
+		expect(await collections.mlAutomations.countDocuments({})).toBe(0);
+	});
+});
+
+describe("stopping an automation run from the web", () => {
+	it("ends a run parked on a wait", async () => {
+		const { user, automation } = await seed();
+		rounds({
+			toolCalls: [
+				{ id: "w", name: "wait", arguments: JSON.stringify({ seconds: 600, reason: "job" }) },
+			],
+		});
+		const result = await deliver(automation, "d1");
+		await result.run;
+		const conversationId = result.conversationId;
+		if (!conversationId) throw new Error("expected a run");
+		expect(await collections.turnStates.findOne({ conversationId })).toMatchObject({
+			status: "waiting",
+		});
+
+		const locals = { user, sessionId: "browser", isAdmin: false };
+		expect(await stopAutomationRun(locals, conversationId)).toBe(true);
+		expect(await collections.turnStates.findOne({ conversationId })).toMatchObject({
+			status: "failed",
+		});
+		expect(
+			await collections.parkedCalls.countDocuments({ conversationId, status: "waiting" })
+		).toBe(0);
+		const conv = await collections.conversations.findOne({ _id: conversationId });
+		const last = conv?.messages.at(-1);
+		expect(last?.interrupted).toBe(true);
+		expect(last?.updates?.filter((u) => u.type === "turnState").at(-1)).toMatchObject({
+			state: "failed",
+		});
+	});
+
+	it("refuses another owner and a conversation no automation started", async () => {
+		const { user, automation } = await seed();
+		rounds({ content: "Ran it." });
+		const result = await deliver(automation, "d1");
+		await result.run;
+		const conversationId = result.conversationId;
+		if (!conversationId) throw new Error("expected a run");
+		const { user: other } = await createTestUser();
+		expect(
+			await stopAutomationRun({ user: other, sessionId: "x", isAdmin: false }, conversationId)
+		).toBe(false);
+
+		const plain = new ObjectId();
+		await collections.conversations.insertOne({
+			_id: plain,
+			userId: user._id,
+			model: "m",
+			title: "t",
+			messages: [],
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		});
+		expect(await stopAutomationRun({ user, sessionId: "x", isAdmin: false }, plain)).toBe(false);
 	});
 });
 

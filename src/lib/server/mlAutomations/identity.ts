@@ -11,6 +11,8 @@ const box = createSecretBox(
 );
 
 export const sealToken = (token: string) => box.encrypt(token);
+/** empty when the token was sealed under a key this server no longer has */
+export const openToken = (sealed: string) => box.decrypt(sealed);
 
 const PREFIX = "ml-automation:";
 
@@ -30,7 +32,7 @@ export function automationLocals(
 ): App.Locals & { user: User } {
 	if (!user._id.equals(automation.userId))
 		throw new AutomationIdentityError("This automation belongs to another account.");
-	const token = box.decrypt(automation.token);
+	const token = openToken(automation.token);
 	if (!token)
 		throw new AutomationIdentityError(
 			"This automation's Hub token can no longer be read. Add the token again."

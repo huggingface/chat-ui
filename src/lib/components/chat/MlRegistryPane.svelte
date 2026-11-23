@@ -322,7 +322,7 @@
 					</span>
 				{/if}
 			</div>
-			{#if !page.data.slackThreadUrl && isStoppableSandbox(service)}
+			{#if !page.data.slackThreadUrl && !page.data.automationRepoUrl && isStoppableSandbox(service)}
 				{@const note = billingNote(service, idle, now)}
 				<div
 					class="ml-sandbox-billing mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#78716c] dark:text-[#a8a29e]"

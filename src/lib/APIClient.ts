@@ -149,6 +149,15 @@ export function useAPIClient({
 		spaces: {
 			deploy: endpoint(fetcher, `${baseUrl}/spaces/deploy`),
 		},
+		"ml-automations": Object.assign(
+			(params: { id: string }) => endpoint(fetcher, `${baseUrl}/ml-automations/${params.id}`),
+			{
+				...endpoint(fetcher, `${baseUrl}/ml-automations`),
+				runs: (conversationId: string) => ({
+					stop: endpoint(fetcher, `${baseUrl}/ml-automations/runs/${conversationId}/stop`),
+				}),
+			}
+		),
 		"public-config": endpoint(fetcher, `${baseUrl}/public-config`),
 		"feature-flags": endpoint(fetcher, `${baseUrl}/feature-flags`),
 		debug: {
