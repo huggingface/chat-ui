@@ -14,6 +14,7 @@
 	import LucideImage from "~icons/lucide/image";
 	import LucideHammer from "~icons/lucide/hammer";
 	import IconGear from "~icons/bi/gear-fill";
+	import CarbonFlash from "~icons/carbon/flash";
 	import CarbonListNumbered from "~icons/carbon/list-numbered";
 	import { providerHubOrg } from "$lib/utils/providerHubOrg";
 	import { shownProvider } from "$lib/utils/shownProvider";
@@ -297,6 +298,20 @@
 				</button>
 			{/each}
 
+			{#if ML_ASSISTANT_MODE && page.data.user}
+				<button
+					type="button"
+					onclick={() => goto(`${base}/settings/automations`)}
+					class="group sticky bottom-9 mt-1 flex h-9 w-full flex-none items-center gap-1 rounded-lg px-3 text-[13px] text-gray-600 max-md:order-first md:rounded-xl md:px-3 dark:text-gray-300 {page
+						.url.pathname === `${base}/settings/automations`
+						? 'bg-gray-100! text-gray-800! dark:bg-gray-700! dark:text-gray-200!'
+						: 'bg-white hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700'}"
+					aria-label="Configure ML Intern automations"
+				>
+					<CarbonFlash class="mr-0.5 text-xxs" />
+					ML Intern automations
+				</button>
+			{/if}
 			<button
 				type="button"
 				onclick={() => goto(`${base}/settings/application`)}

@@ -488,6 +488,7 @@
 	}
 	let canDeploy = $derived(
 		!page.data.slackThreadUrl &&
+			!page.data.automationRepoUrl &&
 			publicConfig.isHuggingChat &&
 			!!conversationId &&
 			!!version &&

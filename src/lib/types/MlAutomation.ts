@@ -2,6 +2,11 @@ import type { ObjectId } from "mongodb";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 
+export interface MlWatchedItem {
+	type: "user" | "org" | "model" | "dataset" | "space";
+	name: string;
+}
+
 export interface MlBillTo {
 	organization: string;
 	resourceGroup?: string;
@@ -13,6 +18,9 @@ export interface MlAutomation extends Timestamps {
 	userId: User["_id"];
 	name: string;
 	instruction: string;
+	watched: MlWatchedItem[];
+	/** absent when the owner registers the webhook on the hub themselves */
+	webhookId?: string;
 	/** ceiling for each run, nobody can raise it */
 	budgetUsd: number;
 	maxRunsPerDay: number;

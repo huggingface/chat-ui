@@ -17,6 +17,8 @@ export interface ConversationData {
 	modelId: string;
 	shared: boolean;
 	slackThreadUrl?: string;
+	/** the repo whose hub event started this automation run */
+	automationRepoUrl?: string;
 	deployedSpaces?: Record<string, DeployedSpace>;
 	mlAssistant?: boolean;
 	mlBudget?: MlBudget;

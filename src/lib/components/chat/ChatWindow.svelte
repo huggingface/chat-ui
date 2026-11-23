@@ -117,6 +117,8 @@
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { tap, error as hapticError } from "$lib/utils/haptics";
 	import { page } from "$app/state";
+	import { invalidate } from "$app/navigation";
+	import { UrlDependency } from "$lib/types/UrlDependency";
 
 	// Only this conversation's question; the store outlives a navigation by a tick.
 	let questionStore = $derived(firstQuestionFor(page.params.id));
@@ -137,6 +139,7 @@
 		resuming?: boolean;
 		shared?: boolean;
 		slackThreadUrl?: string;
+		automationRepoUrl?: string;
 		currentModel: Model;
 		models: Model[];
 		preprompt?: string | undefined;
@@ -160,6 +163,7 @@
 		resuming = false,
 		shared = false,
 		slackThreadUrl,
+		automationRepoUrl,
 		currentModel,
 		models,
 		preprompt = undefined,
@@ -174,8 +178,9 @@
 		onqueuedturn,
 	}: Props = $props();
 
+	let managedElsewhere = $derived(!!slackThreadUrl || !!automationRepoUrl);
 	let isReadOnly = $derived(
-		!!slackThreadUrl || !models.some((model) => model.id === currentModel.id)
+		managedElsewhere || !models.some((model) => model.id === currentModel.id)
 	);
 
 	const publicConfig = usePublicConfig();
@@ -840,6 +845,23 @@
 
 	const budgetClient = useAPIClient();
 
+	let stoppingRun = $state(false);
+	let stopRunError = $state<string | undefined>();
+	async function stopAutomationRun() {
+		const id = page.params?.id;
+		if (!id || stoppingRun) return;
+		stoppingRun = true;
+		stopRunError = undefined;
+		try {
+			await budgetClient["ml-automations"].runs(id).stop.post().then(handleResponse);
+			await invalidate(UrlDependency.Conversation);
+		} catch {
+			stopRunError = "Could not stop this run. Try again.";
+		} finally {
+			stoppingRun = false;
+		}
+	}
+
 	/**
 	 * Commits a new amount left. The server turns it into a total against the
 	 * live ledger; the strip shows the expected figure at once, takes the
@@ -1237,7 +1259,7 @@
 								{/if}
 							</div>
 						{/each}
-						{#if isReadOnly && !slackThreadUrl}
+						{#if isReadOnly && !managedElsewhere}
 							<ModelSwitch models={switchableModels} {currentModel} />
 						{/if}
 					</div>
@@ -1352,7 +1374,7 @@
 			{/if}
 
 			<div class="w-full">
-				{#if slackThreadUrl}
+				{#if managedElsewhere}
 					{#if ML_ASSISTANT_MODE}
 						<MlAssistantStrip
 							visible={mlStripVisible}
@@ -1369,10 +1391,36 @@
 					<div
 						class="rounded-xl border bg-gray-100 p-4 text-sm dark:border-gray-700 dark:bg-gray-800"
 					>
-						<p>This session is managed in Slack. This view is read-only.</p>
-						<a class="font-medium underline" href={slackThreadUrl} target="_blank" rel="noreferrer"
-							>Continue in Slack</a
-						>
+						{#if automationRepoUrl}
+							<p>
+								An automation started this session from a Hub event on
+								<a
+									class="font-medium underline"
+									href={automationRepoUrl}
+									target="_blank"
+									rel="noreferrer">{automationRepoUrl.replace("https://huggingface.co/", "")}</a
+								>. It runs on its own, so this view is read-only.
+							</p>
+							{#if loading || turnWaiting}
+								<button
+									type="button"
+									class="mt-2 rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-medium hover:bg-gray-50 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600"
+									disabled={stoppingRun}
+									onclick={stopAutomationRun}>{stoppingRun ? "Stopping..." : "Stop run"}</button
+								>
+							{/if}
+							{#if stopRunError}
+								<p class="mt-1 text-xs text-red-600 dark:text-red-400">{stopRunError}</p>
+							{/if}
+						{:else}
+							<p>This session is managed in Slack. This view is read-only.</p>
+							<a
+								class="font-medium underline"
+								href={slackThreadUrl}
+								target="_blank"
+								rel="noreferrer">Continue in Slack</a
+							>
+						{/if}
 					</div>
 				{:else}
 					{#if askQuestion}

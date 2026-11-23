@@ -14,6 +14,7 @@ import type { QueuedInput } from "$lib/types/QueuedInput";
 import type { User } from "$lib/types/User";
 import { submitElicitationAnswer, type SubmitResult } from "$lib/server/mcp/elicitation";
 import { kickAnsweredAsk } from "$lib/server/generation/askResume";
+import { turnAbandoned } from "$lib/server/generation/turnState";
 import { assertOwns, ownerFilter, owns } from "./owner";
 import type { RunId, RunRef, TurnInput } from "./types";
 
@@ -192,16 +193,22 @@ export async function stopRun(opts: {
 			},
 		}
 	);
-	const parked = await collections.turnStates.findOneAndUpdate(
-		{ conversationId, status: { $in: ["waiting", "awaiting_input"] } },
-		{ $set: { status: "failed", error: reason, endedAt: now, updatedAt: now } },
-		{ returnDocument: "after" }
-	);
-	if (parked) {
+	const parked = await collections.turnStates.findOne({
+		conversationId,
+		status: { $in: ["waiting", "awaiting_input"] },
+	});
+	// the update goes into the message too, the web reads a turn state from there
+	const failed =
+		parked &&
+		(await turnAbandoned(conversationId, parked.messageId, reason, ["waiting", "awaiting_input"]));
+	if (parked && failed) {
 		await collections.abortedGenerations.deleteOne({ conversationId, updatedAt: { $lte: now } });
 		await collections.conversations.updateOne(
 			{ _id: conversationId, "messages.id": parked.messageId },
-			{ $set: { "messages.$.interrupted": true, updatedAt: now } }
+			{
+				$set: { "messages.$.interrupted": true, "messages.$.updatedAt": now, updatedAt: now },
+				$push: { "messages.$.updates": failed },
+			} as never
 		);
 	}
 }
