@@ -1,5 +1,9 @@
 import { loadMcpSelection, selectionLocals } from "$lib/server/mcp/savedSelection";
 import {
+	parseAutomationSessionId,
+	rebuildAutomationIdentity,
+} from "$lib/server/mlAutomations/identity";
+import {
 	parseLinkedSessionId,
 	connectedLocals,
 	linkedSessionId,
@@ -266,6 +270,9 @@ export async function savedSlackSelection(
  * tool result, so it can say so rather than failing opaquely on the first call.
  */
 export async function rebuildIdentity(park: Pick<ParkedCall, "userId" | "sessionId">) {
+	const automationId = parseAutomationSessionId(park.sessionId);
+	if (automationId) return rebuildAutomationIdentity(automationId, park.userId);
+
 	const slackThreadId = parseLinkedSessionId(park.sessionId);
 	if (slackThreadId) {
 		const thread = await collections.slackThreads.findOne({

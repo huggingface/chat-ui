@@ -39,6 +39,13 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 				config.checkForUpdates();
 			});
 
+			// the hub authenticates with the automation's secret, a session cookie means nothing here
+			if (event.route.id === "/api/v2/ml-automations/[id]/webhook") {
+				event.locals.sessionId = "";
+				event.locals.isAdmin = false;
+				return resolve(event);
+			}
+
 			// Slack viewer routes have their own OIDC identity and per-thread authorization.
 			// Do not turn a Slack browser session into a HuggingChat user session.
 			if (event.url.pathname.startsWith(`${base}/slack/view/`)) {
@@ -221,17 +228,18 @@ export async function handleRequest({ event, resolve }: HandleInput): Promise<Re
 			}
 
 			// Slack's trusted runner calls generation directly; browser/API callers are view-only.
-			if (
-				await isSlackConversationMutation(
-					event.request.method,
-					event.route.id,
-					event.params.id,
-					event.locals
-				)
-			) {
+			const managedBy = await isSlackConversationMutation(
+				event.request.method,
+				event.route.id,
+				event.params.id,
+				event.locals
+			);
+			if (managedBy) {
 				return errorResponse(
 					403,
-					"This session is managed in Slack. Continue in its Slack thread."
+					managedBy === "automation"
+						? "This session was started by an automation and runs on its own."
+						: "This session is managed in Slack. Continue in its Slack thread."
 				);
 			}
 

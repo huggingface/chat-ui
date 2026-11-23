@@ -4,10 +4,12 @@ import type { PlanState } from "./Plan";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 import type { Assistant } from "./Assistant";
+import type { MlAutomation, MlBillTo } from "./MlAutomation";
 
 /** an ml intern session driven from outside the web ui, which shows it read only */
 export interface ManagedBy {
-	kind: "slack";
+	kind: "slack" | "automation";
+	/** where the session is driven from, a slack thread or the repo that fired the automation */
 	continueUrl: string;
 }
 
@@ -43,6 +45,11 @@ export interface Conversation extends Timestamps {
 
 	/** an ml intern session nobody can answer, so it never asks, opens a review or waits for a grant */
 	headless?: boolean;
+
+	automationId?: MlAutomation["_id"];
+
+	/** pinned when the run starts, the owner settings never move it */
+	billTo?: MlBillTo;
 
 	/**
 	 * Spaces this conversation's artifacts have been deployed to, keyed by the

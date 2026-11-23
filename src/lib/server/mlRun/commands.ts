@@ -47,6 +47,8 @@ export async function openRunSession(opts: {
 	budgetUsd: number;
 	/** nobody can answer it, see Conversation.headless */
 	headless?: boolean;
+	automationId?: Conversation["automationId"];
+	billTo?: Conversation["billTo"];
 }): Promise<void> {
 	const model = resolveMlAssistantModel(undefined);
 	if (!model || !models.some((m) => m.id === model))
@@ -69,6 +71,8 @@ export async function openRunSession(opts: {
 		title: opts.title,
 		managedBy: opts.managedBy,
 		...(opts.headless ? { headless: true } : {}),
+		...(opts.automationId ? { automationId: opts.automationId } : {}),
+		...(opts.billTo ? { billTo: opts.billTo } : {}),
 		preprompt: "",
 		mlAssistant: true,
 		rootMessageId: root.id,
