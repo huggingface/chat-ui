@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { fallbackBlocks, highlightCode, processBlocksSync, processTokensSync } from "./marked";
+import {
+	fallbackBlocks,
+	highlightCode,
+	processBlocks,
+	processBlocksSync,
+	processTokensSync,
+} from "./marked";
 
 function renderHtml(md: string): string {
 	const tokens = processTokensSync(md, []);
@@ -20,6 +26,23 @@ describe("marked basic rendering", () => {
 	test("renders bold text", () => {
 		const html = renderHtml("**bold**");
 		expect(html).toContain("<strong>bold</strong>");
+	});
+
+	test.each(["sync", "worker"])("renders reference links across paragraphs (%s)", async (mode) => {
+		const render = mode === "sync" ? processBlocksSync : processBlocks;
+		// Distinct documents make both paths exercise a cold block cache.
+		const url = `https://example.org/${mode}`;
+		const markdown = [
+			"Read [the guide][docs].",
+			"```txt\n[docs]\n```",
+			"See [docs][] again.",
+			`[docs]: ${url}`,
+		].join("\n\n");
+		const tokens = (await render(markdown, [])).flatMap((block) => block.tokens);
+		const html = tokens.flatMap((token) => (token.type === "text" ? [token.html] : [])).join("");
+		expect(html).toContain(`href="${url}" target="_blank" rel="noreferrer">the guide</a>`);
+		expect(html).toContain(`href="${url}" target="_blank" rel="noreferrer">docs</a>`);
+		expect(tokens).toContainEqual(expect.objectContaining({ type: "code", rawCode: "[docs]" }));
 	});
 
 	test("renders links", () => {
