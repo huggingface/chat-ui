@@ -278,6 +278,7 @@ export async function* runMcpFlow({
 					pinnedHubToken() ??
 					(locals as unknown as { hfAccessToken?: string } | undefined)?.hfAccessToken ??
 					(locals as unknown as { token?: string } | undefined)?.token,
+				headless: conv.headless,
 			})
 		: undefined;
 
@@ -1261,7 +1262,12 @@ export async function* runMcpFlow({
 					// own message instead of moving them onto the final answer.
 					roundReasoning: reasoningForToolMsg,
 					roundContent: assistantContentForToolMsg,
-					elicitation: { conversationId: conv._id, generationId, messageId },
+					elicitation: {
+						conversationId: conv._id,
+						generationId,
+						messageId,
+						...(conv.headless ? { headless: true } : {}),
+					},
 					// A parked call resumes with no request behind it, so the identity it
 					// should act as has to be recorded now, while there still is one.
 					owner: {

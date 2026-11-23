@@ -235,6 +235,7 @@ export function createMlBudgetGuard({
 	generationId,
 	username,
 	token,
+	headless = false,
 }: {
 	conversationId: ObjectId;
 	generationId: string;
@@ -242,6 +243,8 @@ export function createMlBudgetGuard({
 	username?: string;
 	/** Hub credential the Jobs API is read with, for settling a stop mid-turn. */
 	token?: string;
+	/** nobody can grant more, so a refusal never tells the model to ask */
+	headless?: boolean;
 }): ToolCallGuard {
 	return {
 		// The resume path re-invokes a parked tool without consulting any guard,
@@ -318,7 +321,11 @@ export function createMlBudgetGuard({
 							remaining
 						)} of the ${formatMicroUsd(
 							reserveResult.budget.totalMicroUsd
-						)} session budget remains. Nothing was submitted. If the user agreed to a raise in conversation, that did not change the ledger — only clicking an ask_user_question option that carries setBudgetUsd does. Lower the timeout or pick a cheaper flavor if that honestly fits the task; otherwise ask again with rescope options alongside an option carrying setBudgetUsd for the smallest amount that covers this run.`,
+						)} session budget remains. Nothing was submitted. ${
+							headless
+								? "Nobody can raise the budget in this session. Lower the timeout or pick a cheaper flavor if that honestly fits the task; otherwise stop and report what this run would need."
+								: "If the user agreed to a raise in conversation, that did not change the ledger — only clicking an ask_user_question option that carries setBudgetUsd does. Lower the timeout or pick a cheaper flavor if that honestly fits the task; otherwise ask again with rescope options alongside an option carrying setBudgetUsd for the smallest amount that covers this run."
+						}`,
 						update: budgetUpdate(reserveResult.budget),
 					};
 				}
@@ -330,7 +337,11 @@ export function createMlBudgetGuard({
 						allow: false,
 						message: `Budget check: this session has no compute budget granted yet, so nothing can be submitted. This ${gated.kind} would need a worst case of ${formatMicroUsd(
 							ceiling
-						)}. If the user already agreed to a budget in conversation, that did not change the ledger — a grant only lands when they click an ask_user_question option that carries setBudgetUsd (a dollar amount written into a label does nothing). Ask with such an option, or point them at the budget field in the composer strip.`,
+						)}. ${
+							headless
+								? "Nobody can grant a budget in this session, so stop and report what this run would need."
+								: "If the user already agreed to a budget in conversation, that did not change the ledger — a grant only lands when they click an ask_user_question option that carries setBudgetUsd (a dollar amount written into a label does nothing). Ask with such an option, or point them at the budget field in the composer strip."
+						}`,
 					};
 			}
 		},

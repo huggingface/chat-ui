@@ -41,6 +41,9 @@ export interface Conversation extends Timestamps {
 	 */
 	mlAssistant?: boolean;
 
+	/** an ml intern session nobody can answer, so it never asks, opens a review or waits for a grant */
+	headless?: boolean;
+
 	/**
 	 * Spaces this conversation's artifacts have been deployed to, keyed by the
 	 * stable artifact `identifier`. Lets a re-deploy push a new commit to the same

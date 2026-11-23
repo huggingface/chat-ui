@@ -21,7 +21,7 @@ import { resolvePreprompt, resolveTurnContext } from "$lib/server/textGeneration
 import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWindowFlag";
 import { attachmentBudgetEnabled } from "$lib/server/textGeneration/utils/attachmentBudgetFlag";
 
-type HarnessConversation = Pick<Conversation, "_id" | "plan" | "mlAssistant">;
+type HarnessConversation = Pick<Conversation, "_id" | "plan" | "mlAssistant" | "headless">;
 
 // fixed so the clock, user and budget in the session and turn context never move the hash
 const FIXED_CONTEXT = { timezone: "UTC", now: new Date(0) };
@@ -37,6 +37,7 @@ function mlAssistantPromptText(conv: HarnessConversation): string {
 			virtualFiles,
 			stateBlock,
 			attachmentBudget,
+			headless: conv.headless,
 			...FIXED_CONTEXT,
 		}),
 		resolveTurnContext({ mlAssistant: true, ...FIXED_CONTEXT }),

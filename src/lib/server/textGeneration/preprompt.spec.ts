@@ -3,6 +3,7 @@ import { resolvePreprompt, resolveTurnContext } from "./preprompt";
 import { injectArtifactsPrompt } from "./artifacts";
 import {
 	ML_ASSISTANT_BUDGET_RULES,
+	ML_ASSISTANT_HEADLESS_BUDGET_RULES,
 	ML_ASSISTANT_PREPROMPT,
 	mlAssistantSessionContext,
 } from "$lib/server/mlAssistantPrompt";
@@ -121,6 +122,13 @@ describe("resolvePreprompt", () => {
 				{ timezone: "UTC", now }
 			)}`
 		);
+	});
+
+	it("swaps in the unattended section and budget rules for a headless run", () => {
+		const resolved = resolvePreprompt({ mlAssistant: true, headless: true }) ?? "";
+		expect(resolved.startsWith("# Running unattended")).toBe(true);
+		expect(resolved).toContain(ML_ASSISTANT_HEADLESS_BUDGET_RULES);
+		expect(resolved).not.toContain(ML_ASSISTANT_BUDGET_RULES);
 	});
 
 	it("stamps the session context last, where the namespace rule reads it", () => {

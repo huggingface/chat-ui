@@ -34,6 +34,13 @@ beforeEach(() => {
 });
 
 describe("getEnabledBuiltinTools", () => {
+	it("withholds every tool that waits on an answer when nobody can answer", () => {
+		const names = toolNames({ _id: new ObjectId(), mlAssistant: true, headless: true });
+		expect(names).not.toContain("ask_user_question");
+		expect(names).not.toContain("request_review");
+		expect(names).toContain("wait");
+	});
+
 	it("offers the preset's builtin tools in an ML Assistant conversation", () => {
 		expect(toolNames({ _id: new ObjectId(), mlAssistant: true })).toEqual([
 			"ask_user_question",

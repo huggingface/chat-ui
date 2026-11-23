@@ -40,7 +40,7 @@ export { isNestedAgentTool } from "./nestedAgent";
  */
 export function getEnabledBuiltinTools(params: {
 	conv: Pick<Conversation, "_id" | "plan" | "mlAssistant"> &
-		Partial<Pick<Conversation, "messages">>;
+		Partial<Pick<Conversation, "messages" | "headless">>;
 	/** Hub namespace to name a Trackio Space in; absent when the run has no user. */
 	namespace?: string;
 	hfToken?: string;
@@ -52,10 +52,13 @@ export function getEnabledBuiltinTools(params: {
 	// definition is static too, but its nested loop needs the turn's request
 	// plumbing, which runMcpFlow binds onto it once that exists.
 	const virtualFiles = mlVirtualFilesEnabled(params.conv);
+	const answerable = !params.conv.headless;
 	return [
-		askUserQuestionBuiltin,
+		...(answerable ? [askUserQuestionBuiltin] : []),
 		// its records and answers are virtual files, so it goes wherever they go
-		...(virtualFiles ? [createRequestReviewTool(params.conv, () => params.hfToken)] : []),
+		...(virtualFiles && answerable
+			? [createRequestReviewTool(params.conv, () => params.hfToken)]
+			: []),
 		createPlanTool(params.conv),
 		createWaitTool({ serviceEvents: mlServiceEventsEnabled() }),
 		...githubGroundingBuiltins(params.conv._id),
