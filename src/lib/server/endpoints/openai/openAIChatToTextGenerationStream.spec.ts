@@ -6,6 +6,7 @@ import {
 	openAIChatToTextGenerationStream,
 } from "./openAIChatToTextGenerationStream";
 import { unescapeThinkTags } from "$lib/utils/escapeThinkTags";
+import { servingProvider } from "./servingProvider";
 
 type Delta = {
 	content?: string;
@@ -124,5 +125,63 @@ describe("openAIChatToTextGenerationStream literal think tags in reasoning", () 
 			text += output.token.text;
 		}
 		expect(text.match(/<\/?think>/g)).toEqual(["<think>", "</think>"]);
+	});
+});
+
+describe("router metadata of calls the HF router sends through OpenRouter", () => {
+	const model = {
+		providers: [
+			{ provider: "deepinfra", provider_name: "DeepInfra" },
+			{ provider: "fireworks-ai", provider_name: "Fireworks" },
+		],
+	};
+	/** what endpointOai passes: the x-inference-provider header, resolved with what the chunks name */
+	const metadataFor = (header: string) => (servedBy?: string) => ({
+		provider: servingProvider(model, header, servedBy),
+	});
+
+	/** OpenRouter names the provider serving the call on every chunk */
+	function openRouterStream(servedBy: string): Stream<OpenAI.Chat.Completions.ChatCompletionChunk> {
+		return (async function* () {
+			yield { provider: servedBy, choices: [{ index: 0, delta: { content: "Hi" } }] };
+			yield { provider: servedBy, choices: [{ index: 0, delta: {}, finish_reason: "stop" }] };
+		})() as unknown as Stream<OpenAI.Chat.Completions.ChatCompletionChunk>;
+	}
+
+	async function streamedProvider(header: string, servedBy: string) {
+		let provider: string | undefined;
+		for await (const output of openAIChatToTextGenerationStream(
+			openRouterStream(servedBy),
+			metadataFor(header)
+		)) {
+			if ("routerMetadata" in output) {
+				provider = (output.routerMetadata as { provider?: string }).provider;
+			}
+		}
+		return provider;
+	}
+
+	it("names the provider that served the call rather than openrouter", async () => {
+		expect(await streamedProvider("openrouter", "DeepInfra")).toBe("deepinfra");
+		expect(await streamedProvider("openrouter", "Fireworks")).toBe("fireworks-ai");
+	});
+
+	it("keeps OpenRouter's name of a provider the model doesn't list", async () => {
+		expect(await streamedProvider("openrouter", "Groq")).toBe("Groq");
+	});
+
+	it("keeps the header of a call the router made directly", async () => {
+		expect(await streamedProvider("together", "DeepInfra")).toBe("together");
+	});
+
+	it("names the provider of a non-streaming completion", async () => {
+		const completion = {
+			provider: "DeepInfra",
+			choices: [{ message: { content: "Hi" } }],
+		} as unknown as OpenAI.Chat.Completions.ChatCompletion;
+		const [output] = await Array.fromAsync(
+			openAIChatToTextGenerationSingle(completion, metadataFor("openrouter"))
+		);
+		expect(output.routerMetadata).toEqual({ provider: "deepinfra" });
 	});
 });

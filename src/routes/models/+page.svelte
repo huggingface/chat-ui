@@ -11,7 +11,8 @@
 	import LucideSettings from "~icons/lucide/settings";
 	import IconFast from "$lib/components/icons/IconFast.svelte";
 	import IconCheap from "$lib/components/icons/IconCheap.svelte";
-	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
+	import CarbonListNumbered from "~icons/carbon/list-numbered";
+	import { providerHubOrg } from "$lib/utils/providerHubOrg";
 	import { shownProvider } from "$lib/utils/shownProvider";
 	import { useSettingsStore } from "$lib/stores/settings";
 	import { goto } from "$app/navigation";
@@ -171,8 +172,7 @@
 						<div class="flex flex-shrink-0 items-center gap-1.5">
 							{#if publicConfig.isHuggingChat && shownProvider(model, $settings.providerOverrides)}
 								{@const providerOverride = shownProvider(model, $settings.providerOverrides) ?? ""}
-								{@const hubOrg =
-									PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
+								{@const hubOrg = providerHubOrg(providerOverride)}
 								{#if providerOverride === "fastest"}
 									<div
 										title="Provider: Fastest"
@@ -186,6 +186,13 @@
 										class="rounded-md bg-gray-100 p-1.5 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
 									>
 										<IconCheap classNames="size-3 sm:size-3.5" />
+									</div>
+								{:else if providerOverride === "preferred"}
+									<div
+										title="Provider: Preferred"
+										class="rounded-md bg-gray-100 p-1.5 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+									>
+										<CarbonListNumbered class="size-3 sm:size-3.5" />
 									</div>
 								{:else if hubOrg}
 									<div

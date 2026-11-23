@@ -19,6 +19,7 @@ import { historyWindowEnabled } from "$lib/server/textGeneration/utils/historyWi
 import { windowLimitChars } from "$lib/server/textGeneration/utils/historyWindow";
 import { prepareAttachments } from "$lib/server/textGeneration/utils/attachmentBudget";
 import { fetchWithProviderFallback } from "./providerFallback";
+import { servingProvider } from "./servingProvider";
 import { inferenceBillingHeaders } from "$lib/server/billing";
 // uuid import removed (no tool call ids)
 
@@ -114,6 +115,10 @@ export async function endpointOai(
 
 		return response;
 	};
+	const servedRouterMetadata = (servedBy?: string) => ({
+		...routerMetadata,
+		provider: servingProvider(model, routerMetadata.provider, servedBy),
+	});
 
 	const openai = new OpenAI({
 		apiKey: apiKey || "sk-",
@@ -301,7 +306,7 @@ export async function endpointOai(
 						signal: abortSignal,
 					}
 				);
-				return openAIChatToTextGenerationStream(openChatAICompletion, () => routerMetadata);
+				return openAIChatToTextGenerationStream(openChatAICompletion, servedRouterMetadata);
 			} else {
 				const openChatAICompletion = await openai.chat.completions.create(
 					body as ChatCompletionCreateParamsNonStreaming,
@@ -320,7 +325,7 @@ export async function endpointOai(
 						signal: abortSignal,
 					}
 				);
-				return openAIChatToTextGenerationSingle(openChatAICompletion, () => routerMetadata);
+				return openAIChatToTextGenerationSingle(openChatAICompletion, servedRouterMetadata);
 			}
 		};
 	} else {
