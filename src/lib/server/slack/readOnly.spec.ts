@@ -27,8 +27,18 @@ it.each([
 	["PUT", "/api/v2/conversations/[id]/files/[...name]"],
 	["POST", "/api/v2/conversations/[id]/reviews/[reviewId]/other"],
 ])("blocks owned Slack mutation %s %s", async (method, route) => {
-	expect(await isSlackConversationMutation(method, route, id, locals)).toBe(true);
+	expect(await isSlackConversationMutation(method, route, id, locals)).toBe("slack");
 	expect(mocks.findOne.mock.calls[0][0]).toEqual({ _id: new ObjectId(id), userId: "owner" });
+});
+it("names an automation as what manages its session", async () => {
+	mocks.findOne.mockResolvedValue({ _id: new ObjectId(id), managedBy: { kind: "automation" } });
+	expect(await isSlackConversationMutation("POST", "/conversation/[id]", id, locals)).toBe(
+		"automation"
+	);
+});
+it("treats a linked Slack session without managedBy as Slack", async () => {
+	mocks.findOne.mockResolvedValue({ _id: new ObjectId(id), sessionId: "slack-user:t1" });
+	expect(await isSlackConversationMutation("POST", "/conversation/[id]", id, locals)).toBe("slack");
 });
 it("allows inspection and sharing without a database lookup", async () => {
 	expect(await isSlackConversationMutation("GET", "/conversation/[id]/stream", id, locals)).toBe(

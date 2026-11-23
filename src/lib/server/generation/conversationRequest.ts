@@ -728,9 +728,12 @@ export async function generateConversationResponse({
 				// Fetch user settings once for all overrides and billing org
 				const userSettings = await collections.settings.findOne(authCondition(locals));
 
-				// Add billing organization to locals for the endpoint to use
-				locals.billingOrganization = userSettings?.billingOrganization;
-				locals.billingResourceGroup = userSettings?.billingResourceGroup;
+				const billTo = conv.billTo ?? {
+					organization: userSettings?.billingOrganization,
+					resourceGroup: userSettings?.billingResourceGroup,
+				};
+				locals.billingOrganization = billTo.organization;
+				locals.billingResourceGroup = billTo.resourceGroup;
 
 				let parkedAgain = false;
 				if (resumeElicitationId) {

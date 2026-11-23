@@ -3,7 +3,7 @@ import { collections } from "$lib/server/database";
 import { authCondition } from "$lib/server/auth";
 import { AbortRegistry } from "$lib/server/abortRegistry";
 import { isManagedConversation } from "$lib/server/mlRun/managed";
-import type { Conversation } from "$lib/types/Conversation";
+import type { Conversation, ManagedBy } from "$lib/types/Conversation";
 import type { MlReview } from "$lib/types/MlReview";
 
 // Slack links reviews to the web, and submitting one resumes the run server-side; checking
@@ -16,6 +16,9 @@ const SERVER_RESUMED_ROUTES = new Set([
 
 const isSlackManaged = (conv: Pick<Conversation, "managedBy" | "sessionId">) =>
 	isManagedConversation(conv) || !!conv.sessionId?.startsWith("slack-user:");
+
+const managedKind = (conv: Pick<Conversation, "managedBy" | "sessionId">) =>
+	isSlackManaged(conv) ? (conv.managedBy?.kind ?? "slack") : undefined;
 
 export async function retireSlackConversations(ids: ObjectId[]): Promise<ObjectId[]> {
 	await collections.slackThreads.updateMany(
@@ -32,7 +35,7 @@ export async function isSlackConversationMutation(
 	routeId: string | null,
 	id: string | undefined,
 	locals?: App.Locals
-) {
+): Promise<ManagedBy["kind"] | false> {
 	if (["GET", "HEAD", "OPTIONS"].includes(method) || !id || !ObjectId.isValid(id) || !locals)
 		return false;
 	const route = routeId?.replace(/\/\([^/]+\)/g, "");
@@ -43,12 +46,13 @@ export async function isSlackConversationMutation(
 		{ _id: new ObjectId(id), ...authCondition(locals) },
 		{ projection: { managedBy: 1, sessionId: 1 } }
 	);
-	if (!conv || !isSlackManaged(conv)) return false;
+	const kind = conv && managedKind(conv);
+	if (!conv || !kind) return false;
 	if (method === "DELETE" && /\/\[id\]$/.test(route)) {
 		await retireSlackConversations([conv._id]);
 		return false;
 	}
-	return true;
+	return kind;
 }
 
 /** Once Slack moves past a review, submitting it would post a new turn the thread never shows. */

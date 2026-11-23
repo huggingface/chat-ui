@@ -47,6 +47,7 @@ import { findRepoRoot } from "./findRepoRoot";
 import type { ConfigKey } from "$lib/types/ConfigKey";
 import { config } from "$lib/server/config";
 import type { MCPOAuthConnection } from "$lib/types/MCPOAuthConnection";
+import type { MlAutomation, MlAutomationDelivery } from "$lib/types/MlAutomation";
 
 import type {
 	SlackThread,
@@ -184,6 +185,8 @@ export class Database {
 		const mlAgentRuns = db.collection<MlAgentRun>("mlAgentRuns");
 		const mlSources = db.collection<MlSource>("mlSources");
 		const mlSessionLabels = db.collection<MlSessionLabel>("mlSessionLabels");
+		const mlAutomations = db.collection<MlAutomation>("mlAutomations");
+		const mlAutomationDeliveries = db.collection<MlAutomationDelivery>("mlAutomationDeliveries");
 		const semaphores = db.collection<Semaphore>("semaphores");
 		const tokenCaches = db.collection<TokenCache>("tokens");
 		const configCollection = db.collection<ConfigKey>("config");
@@ -234,6 +237,8 @@ export class Database {
 			mlAgentRuns,
 			mlSources,
 			mlSessionLabels,
+			mlAutomations,
+			mlAutomationDeliveries,
 			settings,
 			users,
 			sessions,
@@ -277,6 +282,8 @@ export class Database {
 			mlAgentRuns,
 			mlSources,
 			mlSessionLabels,
+			mlAutomations,
+			mlAutomationDeliveries,
 			settings,
 			users,
 			sessions,
@@ -469,6 +476,15 @@ export class Database {
 		mlSessionLabels
 			.createIndex({ reconcileAt: 1 })
 			.catch((e) => logger.error(e, "Error creating index for mlSessionLabels by due time"));
+		mlAutomations
+			.createIndex({ userId: 1, createdAt: -1 })
+			.catch((e) => logger.error(e, "Error creating index for mlAutomations by user"));
+		mlAutomationDeliveries
+			.createIndex({ automationId: 1, status: 1, receivedAt: -1 })
+			.catch((e) => logger.error(e, "Error creating index for mlAutomationDeliveries by run"));
+		mlAutomationDeliveries
+			.createIndex({ receivedAt: 1 }, { expireAfterSeconds: 30 * 86400 })
+			.catch((e) => logger.error(e, "Error creating index for mlAutomationDeliveries expiry"));
 
 		// One state document per turn; the unique key is what makes the upsert in
 		// turnState.ts race-safe. Ended turns expire like ended generations do.
