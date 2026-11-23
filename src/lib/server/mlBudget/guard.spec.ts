@@ -51,11 +51,17 @@ async function insertConversation(mlBudget?: MlBudget): Promise<ObjectId> {
 
 const HF_URL = "https://hf.co/mcp?login";
 
-function makeGuard(conversationId: ObjectId, callCounter = { n: 0 }, token?: string) {
+function makeGuard(
+	conversationId: ObjectId,
+	callCounter = { n: 0 },
+	token?: string,
+	headless = false
+) {
 	const guard = createMlBudgetGuard({
 		conversationId,
 		generationId: "gen-1",
 		username: "testuser",
+		headless,
 		...(token ? { token } : {}),
 	});
 	const before = (tool: string, args: Record<string, unknown>, serverUrl = HF_URL) =>
@@ -228,6 +234,20 @@ describe.sequential("mlBudget guard: pricing the submission", () => {
 			}
 		}
 	);
+
+	it("tells a headless run to stop and report, never to ask", { timeout: 15000 }, async () => {
+		const args = { operation: "run", args: { flavor: "t4-small", timeout: "10m" } };
+		for (const budget of [undefined, budgetOf(1_000)]) {
+			const { before } = makeGuard(await insertConversation(budget), { n: 0 }, undefined, true);
+			const verdict = await before("hf_jobs", args);
+			expect(verdict.allow).toBe(false);
+			if (!verdict.allow) {
+				expect(verdict.message).toContain("stop and report");
+				expect(verdict.message).not.toContain("ask_user_question");
+				expect(verdict.message).not.toContain("setBudgetUsd");
+			}
+		}
+	});
 
 	it("refuses what the remaining budget cannot cover, with the numbers", async () => {
 		const id = await insertConversation(budgetOf(1_000_000));

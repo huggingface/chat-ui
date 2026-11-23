@@ -46,7 +46,12 @@ const processToolOutput = (text: string) => ({ annotated: text, sources: [] });
 
 async function drain(
 	calls: NormalizedToolCall[],
-	elicitation?: { conversationId: ObjectId; generationId?: string; messageId?: string },
+	elicitation?: {
+		conversationId: ObjectId;
+		generationId?: string;
+		messageId?: string;
+		headless?: boolean;
+	},
 	builtinTools?: BuiltinTool[],
 	guard?: import("./toolGuard").ToolCallGuard
 ) {
@@ -209,6 +214,40 @@ describe("executeToolCalls durable elicitation", () => {
 		const doc = await collections.turnStates.findOne({ conversationId, messageId: "assistant-1" });
 		expect(doc?.status).toBe("awaiting_input");
 		expect(doc?.producerId).toBe("gen-1");
+	});
+});
+
+describe("executeToolCalls without anyone to answer", () => {
+	it("refuses a tool that asks for input instead of parking the turn", async () => {
+		await ready;
+		const conversationId = new ObjectId();
+		mcpMock.callMcpTool.mockResolvedValue(
+			mcpResult({
+				inputRequired: {
+					inputRequests: {
+						name: {
+							method: "elicitation/create",
+							params: {
+								message: "What is your name?",
+								requestedSchema: { type: "object", properties: { name: { type: "string" } } },
+							},
+						},
+					},
+				},
+			} as Partial<McpToolTextResponse>)
+		);
+
+		const events = await drain([CALL], {
+			conversationId,
+			generationId: "gen-1",
+			messageId: "assistant-1",
+			headless: true,
+		});
+
+		expect(String(toolMessagesOf(events)[0]?.content)).toContain("nobody can answer");
+		expect(mcpMock.callMcpTool.mock.calls[0]?.[3]).not.toHaveProperty("elicitation");
+		expect(await collections.mcpElicitations.countDocuments({ conversationId })).toBe(0);
+		expect(await collections.turnStates.countDocuments({ conversationId })).toBe(0);
 	});
 });
 

@@ -1,6 +1,7 @@
 import { injectArtifactsPrompt } from "./artifacts";
 import {
 	ML_ASSISTANT_BUDGET_RULES,
+	ML_ASSISTANT_HEADLESS_BUDGET_RULES,
 	mlAssistantPreprompt,
 	mlAssistantSessionContext,
 	mlAssistantTurnContext,
@@ -19,6 +20,8 @@ export interface PrepromptInput {
 	stateBlock?: boolean;
 	/** whether large attachments reach the model cut, defaults on like the switch */
 	attachmentBudget?: boolean;
+	/** nobody can answer this session, see Conversation.headless */
+	headless?: boolean;
 	/** Per-model user override for artifacts, from the model settings page. */
 	artifactsOverride?: boolean;
 	/** Whether the model advertises artifact support (supportsArtifacts). */
@@ -51,6 +54,7 @@ export function resolvePreprompt({
 	virtualFiles,
 	stateBlock,
 	attachmentBudget,
+	headless,
 	artifactsOverride,
 	supportsArtifacts,
 	username,
@@ -65,6 +69,7 @@ export function resolvePreprompt({
 				virtualFiles: virtualFiles ?? true,
 				stateBlock: stateBlock ?? true,
 				attachmentBudget: attachmentBudget ?? true,
+				headless,
 			})
 		: conversationPreprompt;
 	const artifacts = mlAssistant || (artifactsOverride ?? supportsArtifacts);
@@ -73,7 +78,8 @@ export function resolvePreprompt({
 	// Stamped last, after the artifacts prompt, because the preset reads the User
 	// value back out of it — and stamped here rather than onto the tool preprompt
 	// so it still reaches the model on the plain generation path, which has none.
-	return `${resolved}\n\n${ML_ASSISTANT_BUDGET_RULES}\n\n${mlAssistantSessionContext({
+	const budgetRules = headless ? ML_ASSISTANT_HEADLESS_BUDGET_RULES : ML_ASSISTANT_BUDGET_RULES;
+	return `${resolved}\n\n${budgetRules}\n\n${mlAssistantSessionContext({
 		username,
 		publishNamespace,
 		timezone,

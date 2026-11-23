@@ -114,7 +114,13 @@ export interface ExecuteToolCallsParams {
 	/** Visible text streamed before this round's calls; persisted on the round's first Call update. */
 	roundContent?: string;
 	/** Omit and elicitation requests raised by these calls are declined. */
-	elicitation?: { conversationId: ObjectId; generationId?: string; messageId?: string };
+	elicitation?: {
+		conversationId: ObjectId;
+		generationId?: string;
+		messageId?: string;
+		/** nobody can answer, so a tool that asks for input is refused */
+		headless?: boolean;
+	};
 	/** Identity the turn runs as, for a builtin that has to be resumable later. */
 	owner?: { userId?: ObjectId; sessionId?: string };
 	/**
@@ -581,7 +587,9 @@ export async function* executeToolCalls({
 					signal: abortSignal,
 					timeoutMs: effectiveTimeoutMs,
 					...(clientKind ? { clientKind } : {}),
-					...(elicitationSink ? { elicitation: { sink: elicitationSink, toolUuid: p.uuid } } : {}),
+					...(elicitationSink && !elicitation?.headless
+						? { elicitation: { sink: elicitationSink, toolUuid: p.uuid } }
+						: {}),
 					onProgress: (progress) => {
 						updatesQueue.push({
 							type: MessageUpdateType.Tool,
@@ -612,21 +620,23 @@ export async function* executeToolCalls({
 					});
 					return;
 				}
-				const opened = elicitationSink
-					? await openDurableElicitation({
-							sink: elicitationSink,
-							server: mappingEntry.server,
-							toolUuid: p.uuid,
-							pending: {
-								tool: mappingEntry.tool,
-								args: argsObj,
-								messageId: elicitation?.messageId ?? "",
-								toolCallId: p.call.id,
+				const opened = elicitation?.headless
+					? { opened: false as const, reason: "nobody can answer in this session" }
+					: elicitationSink
+						? await openDurableElicitation({
+								sink: elicitationSink,
+								server: mappingEntry.server,
 								toolUuid: p.uuid,
-							},
-							inputRequired: toolResponse.inputRequired,
-						})
-					: { opened: false, reason: "no chat to ask" };
+								pending: {
+									tool: mappingEntry.tool,
+									args: argsObj,
+									messageId: elicitation?.messageId ?? "",
+									toolCallId: p.call.id,
+									toolUuid: p.uuid,
+								},
+								inputRequired: toolResponse.inputRequired,
+							})
+						: { opened: false, reason: "no chat to ask" };
 
 				if (opened.opened) {
 					// A shown prompt parks the turn on the user — the same lifecycle

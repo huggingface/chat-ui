@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	ML_ASSISTANT_BUDGET_RULES,
+	ML_ASSISTANT_HEADLESS_BUDGET_RULES,
 	ML_ASSISTANT_PREPROMPT,
 	mlAssistantPreprompt,
 	mlAssistantSessionContext,
@@ -549,6 +550,50 @@ describe("ML Assistant system message size", () => {
 		].join("\n\n");
 
 		expect(composed.length).toBeLessThan(42_000);
+	});
+
+	it("sends a headless run less than an attended one", () => {
+		const tools = [...HF_TOOLS, tool("hf_fs_write"), tool("update_plan"), tool("write_file")];
+		const system = (headless: boolean) =>
+			[
+				buildToolPreprompt(
+					headless ? tools : [...tools, tool("ask_user_question"), tool("request_review")],
+					undefined,
+					[
+						...(headless
+							? []
+							: [
+									askUserQuestionBuiltin,
+									{ name: "request_review", preprompt: REQUEST_REVIEW_PREPROMPT },
+								]),
+						{ name: "write_file", preprompt: VIRTUAL_FILES_TOOL_PREPROMPT },
+					],
+					{ mlAssistant: true }
+				),
+				mlAssistantPreprompt({
+					virtualFiles: true,
+					stateBlock: true,
+					attachmentBudget: true,
+					headless,
+				}),
+				headless ? ML_ASSISTANT_HEADLESS_BUDGET_RULES : ML_ASSISTANT_BUDGET_RULES,
+				ARTIFACTS_SYSTEM_PROMPT,
+			].join("\n\n");
+		expect(system(true).length).toBeLessThan(system(false).length);
+	});
+
+	it("tells a headless run it cannot ask or raise the budget", () => {
+		const prompt = mlAssistantPreprompt({
+			virtualFiles: true,
+			stateBlock: true,
+			attachmentBudget: true,
+			headless: true,
+		});
+		expect(prompt.startsWith("# Running unattended")).toBe(true);
+		expect(prompt).toContain("stop before spending on it");
+		expect(ML_ASSISTANT_HEADLESS_BUDGET_RULES).not.toContain("ask_user_question");
+		expect(ML_ASSISTANT_HEADLESS_BUDGET_RULES).not.toContain("setBudgetUsd");
+		expect(ML_ASSISTANT_PREPROMPT).not.toContain("Running unattended");
 	});
 
 	it("keeps the review guidance short, the rest lives in the tool description", () => {

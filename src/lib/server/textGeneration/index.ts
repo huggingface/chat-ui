@@ -123,6 +123,7 @@ async function* textGenerationWithoutTitle(
 		virtualFiles: mlVirtualFilesEnabled(conv),
 		stateBlock: mlStateBlockEnabled(conv),
 		attachmentBudget: attachmentBudgetEnabled(),
+		headless: conv.headless,
 		artifactsOverride: ctx.artifactsOverride,
 		supportsArtifacts: ctx.model.supportsArtifacts,
 		username: ctx.username,
