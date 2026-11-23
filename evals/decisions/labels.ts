@@ -182,7 +182,10 @@ function isRerun(c: ActionCall): boolean {
 }
 
 export function scriptName(call: ActionCall): string | undefined {
-	return JSON.stringify(call.args).match(/v-file:\/\/([\w.-]+?)(?:@v\d+)?"/)?.[1];
+	// v-file paths may include directories (v-file://scripts/train.py@v2). Compare basenames
+	// so a nested path still matches failedScript and sandboxed file names.
+	const path = JSON.stringify(call.args).match(/v-file:\/\/([\w./-]+?)(?:@v\d+)?"/)?.[1];
+	return path?.split("/").pop();
 }
 
 export function isJobSubmit(c: ActionCall): boolean {
