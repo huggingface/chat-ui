@@ -169,6 +169,24 @@ const MAX_CUT_ANSWER_RETRIES = 1;
 // finalizes as-is rather than looping on a model that cannot comply.
 const MAX_LEAKED_TOOL_CALL_RETRIES = 1;
 
+const RESUME_NOTE =
+	"[SYSTEM: Your previous response was cut mid-task by the output limit. Resume from where it left off: make the next tool call or continue the current step. Do not repeat what you already wrote.]";
+
+// When the previous assistant turn was cut mid-task by the output limit, the
+// model reads its partial answer as a finished turn and goes idle on the next
+// "continue" (#2725). Prefix a resume note to the current user message rather
+// than adding a message, so role alternation, history units and the
+// initial-prompt boundary used by the attachment retry stay unchanged.
+function withResumeNote(messages: EndpointMessage[]): EndpointMessage[] {
+	const current = messages.findLastIndex((m) => m.from === "user");
+	if (current < 0) return messages;
+	const previous = messages.slice(0, current).findLast((m) => m.from === "assistant");
+	if (!previous?.interrupted) return messages;
+	return messages.map((m, i) =>
+		i === current ? { ...m, content: `${RESUME_NOTE}\n\n${m.content}` } : m
+	);
+}
+
 // One more attempt after an answer that ends the turn before steps of this
 // turn's plan were even started. A round without tool calls is final, so a model
 // whose reasoning is cut short mid-task reports the leftover half-thought as a
@@ -736,9 +754,10 @@ export async function* runMcpFlow({
 
 		// built again, attachments cut, when the provider refuses the request for its size
 		const readToolImage = makeToolImageReader(conv._id);
+		const promptMessages = withResumeNote(messages);
 		const buildPrompt = (attachments: AttachmentMode) =>
 			buildRequestPrompt({
-				messages,
+				messages: promptMessages,
 				attachments,
 				imageProcessor,
 				multimodal: mmEnabled,

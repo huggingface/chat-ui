@@ -641,6 +641,41 @@ describe("runMcpFlow answers cut by the output limit", () => {
 		const answer = updates.find((u) => u.type === MessageUpdateType.FinalAnswer);
 		expect(answer?.type === MessageUpdateType.FinalAnswer && answer.interrupted).toBe(true);
 	});
+
+	// --- #2725: session goes idle when user says "continue" after an interrupted turn ---
+
+	it("prefixes a resume note to the user 'continue' when the previous assistant turn was interrupted by the output limit", async () => {
+		// Simulate a conversation where the previous assistant turn was cut mid-task
+		// by the output limit (interrupted: true), and the user asked to "continue".
+		const ctx = context();
+		ctx.messages = [
+			{ from: "user", content: "run a training job" },
+			{ from: "assistant", content: "I will start by creating a sandbox.", interrupted: true },
+			{ from: "user", content: "continue" },
+		] as typeof ctx.messages;
+
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+
+		const { result } = await runFlow(ctx);
+
+		expect(result).toBe("completed");
+
+		const first = requestMessages(0);
+		const roles = first.filter((m) => m.role !== "system").map((m) => m.role);
+		// No extra turn: the note is folded into the current user message, so
+		// roles keep alternating for providers that require it.
+		expect(roles).toEqual(["user", "assistant", "user"]);
+		const current = first[first.length - 1];
+		expect(current.role).toBe("user");
+		expect(typeof current.content === "string" && current.content).toMatch(
+			/^\[SYSTEM: Your previous response was cut mid-task[\s\S]*\n\ncontinue$/
+		);
+		// The model should proceed to make tool calls rather than going idle.
+		expect(mocks.executeToolCalls).toHaveBeenCalledTimes(1);
+	});
 });
 
 describe("runMcpFlow termination", () => {
