@@ -641,6 +641,54 @@ describe("runMcpFlow answers cut by the output limit", () => {
 		const answer = updates.find((u) => u.type === MessageUpdateType.FinalAnswer);
 		expect(answer?.type === MessageUpdateType.FinalAnswer && answer.interrupted).toBe(true);
 	});
+
+	// --- #2725: session goes idle when user says "continue" after an interrupted turn ---
+
+	it("injects a resume nudge before the user 'continue' when the previous assistant turn was interrupted by the output limit", async () => {
+		// Simulate a conversation where the previous assistant turn was cut mid-task
+		// by the output limit (interrupted: true), and the user asked to "continue".
+		const ctx = context();
+		ctx.messages = [
+			{ from: "user", content: "run a training job" },
+			{ from: "assistant", content: "I will start by creating a sandbox.", interrupted: true },
+			{ from: "user", content: "continue" },
+		] as typeof ctx.messages;
+
+		scriptRounds([
+			{ toolCalls: [{ id: "call_1", name: "do_thing", arguments: "{}" }] },
+			{ content: "done" },
+		]);
+
+		const { result } = await runFlow(ctx);
+
+		expect(result).toBe("completed");
+
+		const first = requestMessages(0);
+
+		// A [SYSTEM] resume nudge must appear between the interrupted assistant turn
+		// and the user "continue" message so the model resumes the task instead of
+		// going idle.
+		const assistantIdx = first.findLastIndex((m) => m.role === "assistant");
+		const continueIdx = first.findLastIndex(
+			(m) => m.role === "user" && typeof m.content === "string" && m.content === "continue"
+		);
+		const nudgeIdx = first.findIndex(
+			(m, i) =>
+				m.role === "user" &&
+				typeof m.content === "string" &&
+				m.content.startsWith("[SYSTEM") &&
+				i > assistantIdx &&
+				i < continueIdx
+		);
+
+		expect(assistantIdx, "interrupted assistant turn must be in the prompt").toBeGreaterThan(-1);
+		expect(continueIdx, "'continue' user message must be in the prompt").toBeGreaterThan(-1);
+		expect(nudgeIdx, "a [SYSTEM] resume nudge must precede the 'continue' message").toBeGreaterThan(
+			-1
+		);
+		// The model should proceed to make tool calls rather than going idle.
+		expect(mocks.executeToolCalls).toHaveBeenCalledTimes(1);
+	});
 });
 
 describe("runMcpFlow termination", () => {

@@ -763,6 +763,29 @@ export async function* runMcpFlow({
 		let attachmentsCut = false;
 		let pendingNotice = budgetNotice(built.attachments);
 
+		// When the previous assistant turn was interrupted mid-task by the output
+		// limit, the model sees its partial answer as a completed turn and goes idle
+		// on the next "continue" message.  Inject a [SYSTEM] nudge before the
+		// current user message so the model resumes the actual work instead.
+		const prevAssistant = [...messages].reverse().find((m) => m.from === "assistant");
+		if (prevAssistant?.interrupted) {
+			const lastUserIdx = messagesOpenAI.reduce<number>(
+				(last, m, i) => (m.role === "user" ? i : last),
+				-1
+			);
+			if (lastUserIdx >= 0) {
+				messagesOpenAI = [
+					...messagesOpenAI.slice(0, lastUserIdx),
+					{
+						role: "user" as const,
+						content:
+							"[SYSTEM: Your previous response was cut mid-task by the output limit. Resume from where it left off — make the next tool call or continue the current step. Do not repeat what you already wrote.]",
+					},
+					...messagesOpenAI.slice(lastUserIdx),
+				];
+			}
+		}
+
 		const completionBase = completionRequestBase({
 			model: targetModel.id ?? targetModel.name,
 			provider: requested.provider,
