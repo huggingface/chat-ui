@@ -644,7 +644,7 @@ describe("runMcpFlow answers cut by the output limit", () => {
 
 	// --- #2725: session goes idle when user says "continue" after an interrupted turn ---
 
-	it("injects a resume nudge before the user 'continue' when the previous assistant turn was interrupted by the output limit", async () => {
+	it("prefixes a resume note to the user 'continue' when the previous assistant turn was interrupted by the output limit", async () => {
 		// Simulate a conversation where the previous assistant turn was cut mid-task
 		// by the output limit (interrupted: true), and the user asked to "continue".
 		const ctx = context();
@@ -664,27 +664,14 @@ describe("runMcpFlow answers cut by the output limit", () => {
 		expect(result).toBe("completed");
 
 		const first = requestMessages(0);
-
-		// A [SYSTEM] resume nudge must appear between the interrupted assistant turn
-		// and the user "continue" message so the model resumes the task instead of
-		// going idle.
-		const assistantIdx = first.findLastIndex((m) => m.role === "assistant");
-		const continueIdx = first.findLastIndex(
-			(m) => m.role === "user" && typeof m.content === "string" && m.content === "continue"
-		);
-		const nudgeIdx = first.findIndex(
-			(m, i) =>
-				m.role === "user" &&
-				typeof m.content === "string" &&
-				m.content.startsWith("[SYSTEM") &&
-				i > assistantIdx &&
-				i < continueIdx
-		);
-
-		expect(assistantIdx, "interrupted assistant turn must be in the prompt").toBeGreaterThan(-1);
-		expect(continueIdx, "'continue' user message must be in the prompt").toBeGreaterThan(-1);
-		expect(nudgeIdx, "a [SYSTEM] resume nudge must precede the 'continue' message").toBeGreaterThan(
-			-1
+		const roles = first.filter((m) => m.role !== "system").map((m) => m.role);
+		// No extra turn: the note is folded into the current user message, so
+		// roles keep alternating for providers that require it.
+		expect(roles).toEqual(["user", "assistant", "user"]);
+		const current = first[first.length - 1];
+		expect(current.role).toBe("user");
+		expect(typeof current.content === "string" && current.content).toMatch(
+			/^\[SYSTEM: Your previous response was cut mid-task[\s\S]*\n\ncontinue$/
 		);
 		// The model should proceed to make tool calls rather than going idle.
 		expect(mocks.executeToolCalls).toHaveBeenCalledTimes(1);
