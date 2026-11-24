@@ -1,6 +1,5 @@
 import type { TrackioDashboardView } from "$lib/utils/trackioView";
 import type { PaperQuote } from "$lib/utils/paper";
-import type { InferenceProvider } from "@huggingface/inference";
 import type { MessageUpdate } from "./MessageUpdate";
 import type { Timestamps } from "./Timestamps";
 import type { v4 } from "uuid";
@@ -45,7 +44,7 @@ export type Message = Partial<Timestamps> & {
 	routerMetadata?: {
 		route: string;
 		model: string;
-		provider?: InferenceProvider;
+		provider?: string;
 	};
 
 	/** what the latest run ran under, ml assistant only, never sent to the model */

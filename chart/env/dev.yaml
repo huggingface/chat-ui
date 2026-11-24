@@ -82,8 +82,10 @@ envVars:
   # and baseten 0/4 at 761k, deepinfra 0/5 at 910k).
   # together and fireworks-ai are billing disabled on the router, so DeepSeek-V4-Pro-0813
   # stays out until another provider passes the probe
+  # Kimi-K3.1-Pro on deepinfra (2026-11-17): 4/4 at 767k, 4/5 at 922k. No other
+  # provider was probed above 300k.
   ML_ASSISTANT_MODELS: >
-    [{"id": "zai-org/GLM-5.3-Flash", "provider": "novita"}, {"id": "moonshotai/Kimi-K3", "provider": "baseten"}, {"id": "zai-org/GLM-5.3", "provider": "novita"}, {"id": "deepseek-ai/DeepSeek-V4-Flash-0731", "provider": "novita"}, {"id": "deepseek-ai/DeepSeek-V4.1-Flash-1017", "provider": "novita"}]
+    [{"id": "zai-org/GLM-5.3-Flash", "provider": "novita"}, {"id": "moonshotai/Kimi-K3", "provider": "baseten"}, {"id": "moonshotai/Kimi-K3.1-Pro", "provider": "deepinfra"}, {"id": "zai-org/GLM-5.3", "provider": "novita"}, {"id": "deepseek-ai/DeepSeek-V4-Flash-0731", "provider": "novita"}, {"id": "deepseek-ai/DeepSeek-V4.1-Flash-1017", "provider": "novita"}]
   MCP_SERVERS: >
     [{"name": "Web Search (Exa)", "url": "https://mcp.exa.ai/mcp?tools=web_search_exa,get_code_context_exa,crawling_exa"}, {"name": "Hugging Face", "url": "https://hf.co/mcp?login"}]
   MCP_TOOL_TIMEOUT_MS: "120000"
@@ -93,6 +95,44 @@ envVars:
   MODELS: >
     [
       { "id": "omni", "supportsArtifacts": true },
+      { "id": "ByteDance-Seed/UI-TARS-1.5-7B", "description": "Vision-language GUI agent for screen understanding and computer control." },
+      { "id": "CohereLabs/c4ai-command-r7b-arabic-02-2025", "description": "Compact 7B Command R tuned for Arabic and English enterprise tasks." },
+      { "id": "CohereLabs/command-a-plus-05-2026-bf16", "description": "Flagship 218B Command A+ for enterprise agents, vision, and tool use.", "supportsArtifacts": true },
+      { "id": "Gryphe/MythoMax-L2-13b", "description": "Llama 2 13B merge for creative writing and roleplay storytelling." },
+      { "id": "LiquidAI/LFM2.5-24B-A2B", "description": "Liquid 24B MoE with 2B active, always reasoning, built for tool agents." },
+      { "id": "LiquidAI/LFM3-1.7B", "description": "Compact 1.7B reasoning model with 256K context for agents and tools." },
+      { "id": "NousResearch/Hermes-4-405B", "description": "Hybrid-reasoning Llama 3.1 405B fine-tune for math, code, and steerable chat.", "supportsArtifacts": true },
+      { "id": "Qwen/Qwen2.5-VL-72B-Instruct", "description": "72B vision-language Qwen for document parsing, charts, video, and visual agents.", "supportsArtifacts": true },
+      { "id": "Qwen/Qwen3-30B-A3B-Instruct-2507", "description": "Non-thinking 30B MoE with 3B active params and 256K context." },
+      { "id": "Qwen/Qwen3-Coder-30B-A3B-Instruct", "description": "Compact 30B MoE coder with 3B active params for agentic coding." },
+      { "id": "Qwen/Qwen3-Coder-480B-A35B-Instruct", "description": "Flagship 480B MoE coder with 35B active for repository-scale agentic coding.", "supportsArtifacts": true },
+      { "id": "Qwen/Qwen3-Coder-Next", "description": "80B hybrid-attention MoE coder with 3B active, built for coding agents.", "supportsArtifacts": true },
+      { "id": "Qwen/Qwen3-VL-8B-Instruct", "description": "Compact vision-language Qwen for OCR, video understanding, and GUI agents." },
+      { "id": "RadixArk/DaisyRose-27B", "description": "Multimodal Qwen3.8-27B reasoner trained with RL on long-horizon agent tasks.", "supportsReasoning": true },
+      { "id": "RekaAI/reka-edge-2603", "description": "Efficient 7B vision-language model for image and video understanding." },
+      { "id": "Sao10K/L3-8B-Lunaris-v1", "description": "Llama 3 8B merge for roleplay and creative storytelling." },
+      { "id": "Undi95/ReMM-SLERP-L2-13B", "description": "Llama 2 13B SLERP merge tuned for roleplay and fiction." },
+      { "id": "aisingapore/Nemotron-SEA-LION-v4.8-120B-A12B", "description": "Nemotron 120B MoE with 12B active tuned for Southeast Asian languages.", "supportsArtifacts": true },
+      { "id": "anthracite-org/magnum-v4-72b", "description": "Qwen2.5 72B fine-tune for rich prose in roleplay and fiction.", "supportsArtifacts": true },
+      { "id": "cyankiwi/Qwen3.5-9B-AWQ-4bit", "description": "AWQ 4-bit Qwen3.5-9B for efficient inference with multimodal hybrid reasoning." },
+      { "id": "dphn/Dolphin-Mistral-24B-Venice-Edition", "description": "Uncensored Mistral Small 24B fine-tune steerable through system prompts." },
+      { "id": "google/gemma-2-27b-it", "description": "Gemma 2 27B open model for chat, writing, and summarization." },
+      { "id": "meta-llama/Llama-3.1-70B-Instruct", "description": "Llama 3.1 70B multilingual assistant with 128K context and tool use.", "supportsArtifacts": true },
+      { "id": "meta-llama/Llama-3.2-3B-Instruct", "description": "Lightweight 3B Llama for on-device chat, summarization, and rewriting." },
+      { "id": "meta-llama/Llama-4-Maverick-17B-128E-Instruct", "description": "Native multimodal 400B MoE with 17B active and 128 experts.", "supportsArtifacts": true },
+      { "id": "mistralai/Mistral-Large-4-1T-A52B", "description": "Multimodal 1T MoE with 52B active, 1M context, and adjustable reasoning.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "moondream/moondream3-preview", "description": "Preview 9B vision MoE with 2B active for grounded visual reasoning." },
+      { "id": "moondream/moondream3.1-9B-A2B", "description": "9B vision MoE with 2B active for VQA, captioning, and OCR." },
+      { "id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16", "description": "BF16 hybrid Mamba-Transformer 30B MoE with 3B active for efficient agents.", "supportsReasoning": true },
+      { "id": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8", "description": "FP8 Nemotron 3 Super 120B MoE with 12B active for multi-agent workloads.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16", "description": "BF16 30B MoE with 3B active for high-throughput agentic workloads.", "supportsReasoning": true },
+      { "id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16", "description": "BF16 vision-language Nemotron 120B MoE with 12B active for documents and GUIs.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "tencent/Hy4", "description": "770B MoE with deep thinking, 1M context, and stronger long-horizon agents.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "thinkingmachines/Inkling-2-Mini", "description": "Multimodal looped-transformer 26B MoE with 3.4B active params.", "supportsReasoning": true },
+      { "id": "thinkingmachines/Inkling-2-Small", "description": "Multimodal 594B MoE reasoning model with 17B active params.", "supportsReasoning": true, "supportsArtifacts": true },
+      { "id": "zai-org/GLM-4.5", "description": "Original 355B GLM MoE unifying agentic, coding, and reasoning skills.", "supportsArtifacts": true },
+      { "id": "zai-org/GLM-4.6-FP8", "description": "FP8 GLM-4.6 for efficient long-context coding, agents, and tool use.", "supportsArtifacts": true },
+      { "id": "zai-org/GLM-5.1-FP8", "description": "FP8 GLM-5.1 for efficient agentic coding, extended reasoning, and tool use.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "MiniMaxAI/MiniMax-M3.1-Flash", "description": "Sparse-attention multimodal MoE with 23B active for agentic coding and computer use.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "Qwen/Qwen3.8-Flash-Next-FP8", "description": "FP8 Qwen3.8-Flash-Next for efficient inference with vision, thinking, and 1M context.", "supportsArtifacts": true },
       { "id": "BSC-LT/ALIA-40b-instruct-2606", "description": "Iberian 40B assistant tuned for Spanish, Catalan, Basque, Galician, and English.", "supportsArtifacts": true },
@@ -112,7 +152,6 @@ envVars:
       { "id": "XiaomiMiMo/MiMo-V2.6-Flash-RL", "description": "Fast 310B MoE with 15B active, RL-scaled for agentic coding.", "supportsArtifacts": true },
       { "id": "tencent/Hy4-preview", "description": "Preview 770B MoE with 49B active params, deep thinking, and 1M context.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "deepseek-ai/DeepSeek-V4.1-Flash", "description": "Native multimodal 552B MoE for agentic coding, adjustable thinking, and 1M context.", "parameters": { "max_tokens": 49152 }, "supportsReasoning": true, "supportsArtifacts": true },
-      { "id": "swiss-ai/Apertus-8B-Instruct-2509", "description": "Open, multilingual, trained on compliant data transparent global assistant." },
       { "id": "deepseek-ai/DeepSeek-V4-Flash-Vision-Exp", "description": "Experimental vision-language V4-Flash for multimodal agents and adjustable thinking.", "parameters": { "max_tokens": 49152 }, "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "inclusionAI/Ling-3.0-flash-VL", "description": "Vision-language Ling-3.0-flash MoE for image, video, and GUI agent tasks.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "inclusionAI/Ling-3.0-flash-Fin", "description": "Finance-tuned Ling-3.0-flash for grounded research, valuation, and spreadsheet workflows.", "supportsReasoning": true, "supportsArtifacts": true },
@@ -134,10 +173,10 @@ envVars:
       { "id": "thinkingmachines/Inkling-Small", "description": "Compact multimodal 276B MoE with 12B active params and adjustable reasoning effort.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "NousResearch/Hermes-3-Llama-3.1-70B", "description": "Steerable 70B Llama fine-tune for roleplay, agents, and function calling.", "supportsArtifacts": true },
       { "id": "Qwen/Qwen3-30B-A3B", "description": "Efficient hybrid 30B MoE with 3B active params and switchable thinking mode." },
+      { "id": "moonshotai/Kimi-K3.1-Pro", "description": "2.8T MoE post-trained from Kimi K3 for agentic work, with native vision and 1M context.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "moonshotai/Kimi-K3", "description": "2.8T MoE with native vision, 1M context, and always-on thinking.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "tencent/Hy3", "description": "295B MoE for deep reasoning, agentic coding, and 256K context.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "XiaomiMiMo/MiMo-V2.5", "description": "310B omnimodal MoE handling text, image, video, and audio at 1M context.", "supportsArtifacts": true },
-      { "id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B", "description": "Distilled Qwen with R1 stepwise reasoning in mid-size footprint." },
       { "id": "thinkingmachines/Inkling", "description": "Multimodal 975B MoE with 41B active params and adjustable reasoning effort.", "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "CohereLabs/tiny-aya-fire", "description": "Regional Aya for South Asian languages with efficient on-device inference." },
       { "id": "XiaomiMiMo/MiMo-V2.5-Pro", "description": "1T MoE with 42B active params, hybrid attention, and 1M context.", "supportsReasoning": true, "supportsArtifacts": true },
@@ -181,7 +220,6 @@ envVars:
       { "id": "openai/gpt-oss-safeguard-20b", "description": "Safety-focused gpt-oss variant for content classification, policy enforcement, and LLM output filtering." , "supportsReasoning": true },
       { "id": "zai-org/GLM-4.5V-FP8", "description": "FP8 vision-language GLM-4.5V for efficient multilingual visual QA, understanding, and hybrid reasoning."},    
       { "id": "zai-org/GLM-4.6", "description": "Next-gen GLM with very long context and solid multilingual reasoning; good for agents and tools."},
-      { "id": "deepseek-ai/DeepSeek-V3.1-Terminus", "description": "Refined V3.1 variant optimized for reliability on long contexts, structured outputs, and tool use."},
       { "id": "zai-org/GLM-4.6V", "description": "106B vision-language model with 128K context and native tool calling for multimodal agents.", "parameters": { "max_tokens": 8192 }},
       { "id": "zai-org/GLM-4.6V-Flash", "description": "9B lightweight vision model for fast local inference with tool calling and UI understanding."},
       { "id": "zai-org/GLM-4.6V-FP8", "description": "FP8-quantized GLM-4.6V for efficient multimodal deployment with native tool use."},
@@ -192,29 +230,20 @@ envVars:
       { "id": "openai/gpt-oss-120b", "description": "High performing open model suitable for large scale applications." , "supportsReasoning": true, "supportsArtifacts": true },
       { "id": "meta-llama/Llama-3.1-8B-Instruct", "description": "Instruction tuned Llama efficient conversational assistant with improved alignment." },
       { "id": "deepseek-ai/DeepSeek-R1", "description": "MoE reasoning model excels at math, logic, coding with steps."},
-      { "id": "Qwen/Qwen3-4B-Instruct-2507", "description": "Compact instruction Qwen great for lightweight assistants and apps." },
-      { "id": "Qwen/Qwen3-4B-Thinking-2507", "description": "Small Qwen that emits transparent step by step reasoning."},
       { "id": "moonshotai/Kimi-K2-Instruct", "description": "MoE assistant strong coding, reasoning, agentic tasks, long context." },
       { "id": "zai-org/GLM-4.5V", "description": "Vision language MoE state of the art multimodal reasoning."},
       { "id": "deepseek-ai/DeepSeek-V3.1", "description": "Supports direct and thinking style reasoning within one model."},
-      { "id": "Qwen/Qwen3-8B", "description": "Efficient Qwen assistant strong multilingual skills and formatting." },
       { "id": "google/gemma-3-27b-it", "description": "Multimodal Gemma long context strong text and image understanding." },
       { "id": "zai-org/GLM-4.5-Air", "description": "Efficient GLM strong reasoning and tool use at lower cost."},
       { "id": "Qwen/Qwen3-32B", "description": "General purpose Qwen strong for complex queries and dialogues." },
       { "id": "Qwen/Qwen3-235B-A22B-Instruct-2507", "description": "Flagship instruction Qwen near state of the art across domains." },
       { "id": "meta-llama/Llama-3.3-70B-Instruct", "description": "Improved Llama alignment and structure powerful complex conversations." },
-      { "id": "Qwen/Qwen3-235B-A22B", "description": "Qwen base at flagship scale ideal for custom fine tuning." },
       { "id": "Qwen/Qwen2.5-Coder-32B-Instruct", "description": "Code model strong generation and tool use bridges sizes." },
-      { "id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B", "description": "Distilled Qwen excels at stepwise logic in compact footprint."},
       { "id": "deepseek-ai/DeepSeek-V3", "description": "General language model direct answers strong creative and knowledge tasks." },
       { "id": "deepseek-ai/DeepSeek-V3-0324", "description": "Updated V3 better reasoning and coding strong tool use." },
       { "id": "deepseek-ai/DeepSeek-R1-0528", "description": "R1 update improved reasoning, fewer hallucinations, adds function calling.", "parameters": { "max_tokens": 32000 }},
       { "id": "Qwen/Qwen3-14B", "description": "Balanced Qwen good performance and efficiency for assistants." },
-      { "id": "MiniMaxAI/MiniMax-M1-80k", "description": "Long context MoE very fast excels at long range reasoning and code."},
-      { "id": "Qwen/Qwen2.5-Coder-7B-Instruct", "description": "Efficient coding assistant for lightweight programming tasks." },
       { "id": "aisingapore/Gemma-SEA-LION-v4-27B-IT", "description": "Gemma SEA LION optimized for Southeast Asian languages or enterprise." },
-      { "id": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8", "description": "FP8 Maverick efficient deployment retains top multimodal capability." },
-      { "id": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B", "description": "Llama distilled from R1 strong reasoning and structured outputs."},
       { "id": "Qwen/Qwen2.5-72B-Instruct", "description": "Accurate detailed instruction model supports tools and long contexts." },
       { "id": "meta-llama/Llama-Guard-4-12B", "description": "Safety guardrail model filters and enforces content policies." },
       { "id": "Sao10K/L3-8B-Stheno-v3.2", "description": "Community Llama variant themed tuning and unique conversational style." },
@@ -223,8 +252,7 @@ envVars:
       { "id": "CohereLabs/c4ai-command-a-03-2025", "description": "Updated Command assistant improved accuracy and general usefulness." },
       { "id": "CohereLabs/command-a-reasoning-08-2025", "description": "Command variant optimized for complex multi step logical reasoning." },
       { "id": "alpindale/WizardLM-2-8x22B", "description": "Multi expert WizardLM MoE approach for efficient high quality generation." },
-      { "id": "CohereLabs/aya-vision-32b", "description": "Larger Aya Vision advanced vision language with detailed reasoning." },
-      { "id": "Qwen/Qwen2.5-Coder-3B-Instruct", "description": "Tiny coding assistant basic code completions and explanations." }
+      { "id": "CohereLabs/aya-vision-32b", "description": "Larger Aya Vision advanced vision language with detailed reasoning." }
     ]
 
 infisical:

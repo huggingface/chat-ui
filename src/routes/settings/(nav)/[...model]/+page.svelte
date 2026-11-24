@@ -16,7 +16,8 @@
 	import CarbonReset from "~icons/carbon/reset";
 	import LucideCheck from "~icons/lucide/check";
 	import CarbonMagicWandFilled from "~icons/carbon/magic-wand-filled";
-	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
+	import CarbonListNumbered from "~icons/carbon/list-numbered";
+	import { providerHubOrg } from "$lib/utils/providerHubOrg";
 	import { Select } from "bits-ui";
 
 	import { goto } from "$app/navigation";
@@ -124,7 +125,7 @@
 		}));
 	}
 
-	type RouterProvider = { provider: string } & Record<string, unknown>;
+	type RouterProvider = { provider: string; provider_name?: string } & Record<string, unknown>;
 
 	$effect(() => {
 		const defaultPreprompt =
@@ -142,9 +143,7 @@
 	let defaultProvider = $derived(
 		(model as { defaultProvider?: string } | undefined)?.defaultProvider
 	);
-	let defaultHubOrg = $derived(
-		PROVIDERS_HUB_ORGS[defaultProvider as keyof typeof PROVIDERS_HUB_ORGS]
-	);
+	let defaultHubOrg = $derived(providerHubOrg(defaultProvider));
 
 	// Providers are excluded from the models list payload (they are ~60KB
 	// across all models and this page is their only reader); fetch them for
@@ -190,15 +189,21 @@
 	});
 
 	// providerOverrides intentionally has no initValue: a saved "auto" is a choice
-	// of the user's own Hub order, and an unset entry falls back to the model's
+	// of the router's routing, and an unset entry falls back to the model's
 	// default provider.
 
 	// Provider selection policies for the dropdown
 	const PROVIDER_POLICIES = $derived([
 		...(defaultProvider
-			? [{ value: DEFAULT_PROVIDER_OPTION, label: `HuggingChat default (${defaultProvider})` }]
+			? [
+					{
+						value: DEFAULT_PROVIDER_OPTION,
+						label: `HuggingChat default (${providerList.find((p) => p.provider === defaultProvider)?.provider_name ?? defaultProvider})`,
+					},
+				]
 			: []),
-		{ value: "auto", label: "Auto (your HF preference order)" },
+		{ value: "auto", label: "Auto (balanced on price and uptime)" },
+		{ value: "preferred", label: "Preferred (your HF preference order)" },
 		{ value: "fastest", label: "Fastest (highest throughput)" },
 		{ value: "cheapest", label: "Cheapest (lowest cost)" },
 	]);
@@ -503,6 +508,10 @@
 									<span class="grid size-5 flex-none place-items-center rounded-md bg-gray-500/10">
 										<CarbonMagicWandFilled class="size-3 text-gray-700 dark:text-gray-300" />
 									</span>
+								{:else if currentValue === "preferred"}
+									<span class="grid size-5 flex-none place-items-center rounded-md bg-gray-500/10">
+										<CarbonListNumbered class="size-3 text-gray-700 dark:text-gray-300" />
+									</span>
 								{:else if currentValue === "fastest"}
 									<span
 										class="grid size-5 flex-none place-items-center rounded-md bg-green-500/10 text-green-600 dark:text-green-500"
@@ -516,13 +525,15 @@
 										<IconCheap classNames="size-3" />
 									</span>
 								{:else if currentProvider}
-									{@const hubOrg =
-										PROVIDERS_HUB_ORGS[currentValue as keyof typeof PROVIDERS_HUB_ORGS]}
+									{@const hubOrg = providerHubOrg(currentValue)}
 									{#if hubOrg}
 										{@render providerAvatar(hubOrg)}
 									{/if}
 								{/if}
-								{currentPolicy?.label ?? currentProvider?.provider ?? currentValue}
+								{currentPolicy?.label ??
+									currentProvider?.provider_name ??
+									currentProvider?.provider ??
+									currentValue}
 							</span>
 							<CarbonChevronDown class="size-4 text-gray-500" />
 						</Select.Trigger>
@@ -552,6 +563,12 @@
 												>
 													<CarbonMagicWandFilled class="size-3 text-gray-700 dark:text-gray-300" />
 												</span>
+											{:else if opt.value === "preferred"}
+												<span
+													class="grid size-5 flex-none place-items-center rounded-md bg-gray-500/10"
+												>
+													<CarbonListNumbered class="size-3 text-gray-700 dark:text-gray-300" />
+												</span>
 											{:else if opt.value === "fastest"}
 												<span
 													class="grid size-5 flex-none place-items-center rounded-md bg-green-500/10 text-green-600 dark:text-green-500"
@@ -580,8 +597,8 @@
 										Specific provider
 									</Select.GroupHeading>
 									{#each providerList as prov (prov.provider)}
-										{@const hubOrg =
-											PROVIDERS_HUB_ORGS[prov.provider as keyof typeof PROVIDERS_HUB_ORGS]}
+										{@const hubOrg = providerHubOrg(prov.provider)}
+										{@const name = prov.provider_name ?? prov.provider}
 										<Select.Item
 											value={prov.provider}
 											class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-hidden select-none data-highlighted:bg-gray-100 dark:text-gray-200 dark:data-highlighted:bg-white/10"
@@ -589,9 +606,13 @@
 											{#if hubOrg}
 												{@render providerAvatar(hubOrg)}
 											{:else}
-												<span class="size-5"></span>
+												<span
+													class="grid size-5 flex-none place-items-center rounded-md bg-gray-500/10 text-[10px] font-semibold text-gray-500 uppercase dark:text-gray-400"
+												>
+													{name[0]}
+												</span>
 											{/if}
-											<span class="flex-1">{prov.provider}</span>
+											<span class="flex-1">{name}</span>
 											{#if getProviderOverride() === prov.provider}
 												<LucideCheck class="size-4 text-gray-500" />
 											{/if}

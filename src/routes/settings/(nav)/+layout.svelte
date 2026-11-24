@@ -14,7 +14,8 @@
 	import LucideImage from "~icons/lucide/image";
 	import LucideHammer from "~icons/lucide/hammer";
 	import IconGear from "~icons/bi/gear-fill";
-	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
+	import CarbonListNumbered from "~icons/carbon/list-numbered";
+	import { providerHubOrg } from "$lib/utils/providerHubOrg";
 	import { shownProvider } from "$lib/utils/shownProvider";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
@@ -217,8 +218,7 @@
 
 					{#if publicConfig.isHuggingChat && shownProvider(model, $settings.providerOverrides)}
 						{@const providerOverride = shownProvider(model, $settings.providerOverrides) ?? ""}
-						{@const hubOrg =
-							PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
+						{@const hubOrg = providerHubOrg(providerOverride)}
 						{#if providerOverride === "fastest"}
 							<span
 								title="Provider: {providerOverride}"
@@ -236,6 +236,15 @@
 								role="img"
 							>
 								<IconCheap classNames="size-3" />
+							</span>
+						{:else if providerOverride === "preferred"}
+							<span
+								title="Provider: {providerOverride}"
+								class="grid size-[21px] flex-none place-items-center rounded-md bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+								aria-label="Provider: {providerOverride}"
+								role="img"
+							>
+								<CarbonListNumbered class="size-3" />
 							</span>
 						{:else if hubOrg}
 							<span

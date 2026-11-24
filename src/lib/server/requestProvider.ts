@@ -27,7 +27,7 @@ export function requestProvider(
 	providerOverrides: Record<string, string> | undefined
 ): ProviderChoice {
 	if (!config.isHuggingChat || model.isRouter) return { providerIsDefault: false };
-	// a saved "auto" is the user asking for their own Hub order, so only an unset one takes the default
+	// a saved "auto" is the user asking for the router's routing, so only an unset one takes the default
 	const saved = providerOverrides?.[model.id] || undefined;
 	const picked = isMlAssistantConversation(conv) ? mlAssistantProviderFor(model.id, saved) : saved;
 	if (picked && isListed(model, picked)) return { provider: picked, providerIsDefault: false };

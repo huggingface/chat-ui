@@ -8,12 +8,13 @@ import { createThinkTagEscaper, escapeThinkTags } from "$lib/utils/escapeThinkTa
  */
 export async function* openAIChatToTextGenerationStream(
 	completionStream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>,
-	getRouterMetadata?: () => { route?: string; model?: string; provider?: string }
+	getRouterMetadata?: (servedBy?: string) => { route?: string; model?: string; provider?: string }
 ) {
 	let generatedText = "";
 	let tokenId = 0;
 	let toolBuffer = ""; // legacy hack kept harmless
 	let metadataYielded = false;
+	let servedBy: string | undefined;
 	let thinkOpen = false;
 	// Leading whitespace-only reasoning deltas that arrived before the block
 	// opened. Held here and flushed once a non-blank delta opens the block, so a
@@ -25,7 +26,10 @@ export async function* openAIChatToTextGenerationStream(
 	for await (const completion of completionStream) {
 		const retyped = completion as {
 			"x-router-metadata"?: { route: string; model: string; provider?: string };
+			/** OpenRouter's name of the provider serving the call, e.g. "DeepInfra" */
+			provider?: unknown;
 		};
+		if (typeof retyped.provider === "string") servedBy = retyped.provider;
 		// Check if this chunk contains router metadata (first chunk from llm-router)
 		if (!metadataYielded && retyped["x-router-metadata"]) {
 			const metadata = retyped["x-router-metadata"];
@@ -170,7 +174,7 @@ export async function* openAIChatToTextGenerationStream(
 
 	// If metadata wasn't yielded from chunks (e.g., from headers), yield it at the end
 	if (!metadataYielded && getRouterMetadata) {
-		const routerMetadata = getRouterMetadata();
+		const routerMetadata = getRouterMetadata(servedBy);
 		// Yield if we have either complete router metadata OR just provider info
 		if (
 			(routerMetadata && routerMetadata.route && routerMetadata.model) ||
@@ -198,7 +202,7 @@ export async function* openAIChatToTextGenerationStream(
  */
 export async function* openAIChatToTextGenerationSingle(
 	completion: OpenAI.Chat.Completions.ChatCompletion,
-	getRouterMetadata?: () => { route?: string; model?: string; provider?: string }
+	getRouterMetadata?: (servedBy?: string) => { route?: string; model?: string; provider?: string }
 ) {
 	const message: NonNullable<OpenAI.Chat.Completions.ChatCompletion.Choice>["message"] & {
 		reasoning?: string;
@@ -236,7 +240,8 @@ export async function* openAIChatToTextGenerationSingle(
 		details: null,
 		...(getRouterMetadata
 			? (() => {
-					const metadata = getRouterMetadata();
+					const { provider } = completion as { provider?: unknown };
+					const metadata = getRouterMetadata(typeof provider === "string" ? provider : undefined);
 					return (metadata && metadata.route && metadata.model) || metadata?.provider
 						? { routerMetadata: metadata }
 						: {};

@@ -74,19 +74,28 @@ export function visibleText(text: string): string {
 	return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "").trim();
 }
 
-/** One line for a failed run. Unknown errors stay generic: the thread may be shared. */
-export function runFailureText(updates: MessageUpdate[] = []): string {
+function failureStatus(updates: MessageUpdate[] = []) {
 	const error = updates.findLast(
 		(update) =>
 			update.type === MessageUpdateType.Status && update.status === MessageUpdateStatus.Error
 	);
-	const status = error?.type === MessageUpdateType.Status ? error : undefined;
+	return error?.type === MessageUpdateType.Status ? error : undefined;
+}
+
+/** The Hub refused the account's token, which a retry alone cannot fix. */
+export function loginRejected(updates?: MessageUpdate[]): boolean {
+	return failureStatus(updates)?.statusCode === 401;
+}
+
+/** One line for a failed run. Unknown errors stay generic: the thread may be shared. */
+export function runFailureText(updates: MessageUpdate[] = []): string {
+	const status = failureStatus(updates);
 	const reason =
 		status?.statusCode === 402
 			? (paymentErrorNotice(status.errorCode) ??
 				"Your Hugging Face account is out of inference credits. Add credits, then retry.")
 			: status?.statusCode === 401
-				? "Your Hugging Face login is no longer valid. Sign in to HuggingChat again, then mention me to reconnect."
+				? "Your Hugging Face login is no longer valid. Mention me again to reconnect."
 				: status?.statusCode === 429
 					? "Hugging Face rate-limited this request. Wait a minute, then retry."
 					: undefined;
