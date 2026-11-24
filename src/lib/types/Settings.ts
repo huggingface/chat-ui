@@ -53,7 +53,7 @@ export interface Settings extends Timestamps {
 
 	/**
 	 * Per-model inference provider preference.
-	 * Values: "auto" (default), "fastest", "cheapest", or a specific provider name (e.g., "together", "sambanova").
+	 * Values: "auto" (default), "preferred", "fastest", "cheapest", or a specific provider name (e.g., "together", "sambanova").
 	 * The value is appended to the model ID when making inference requests (e.g., "model:fastest").
 	 */
 	providerOverrides?: Record<string, string>;

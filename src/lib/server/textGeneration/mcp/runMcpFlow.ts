@@ -69,6 +69,7 @@ import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import type { PlanStep } from "$lib/types/Plan";
 import type { Conversation } from "$lib/types/Conversation";
 import { fetchWithProviderFallback } from "$lib/server/endpoints/openai/providerFallback";
+import { servingProvider } from "$lib/server/endpoints/openai/servingProvider";
 import {
 	isMlAssistantConversation,
 	mlAssistantPayerTarget,
@@ -664,8 +665,9 @@ export async function* runMcpFlow({
 			const res = await fetchWithProviderFallback(input, init, targetModel, {
 				defaultPin: requested.providerIsDefault,
 			});
+			// Each tool round's own, as rounds and fallbacks can be served by different providers
 			const p = res.headers.get("x-inference-provider");
-			if (p && !providerHeader) providerHeader = p;
+			if (p) providerHeader = p;
 			return res;
 		};
 
@@ -942,23 +944,33 @@ export async function* runMcpFlow({
 			pendingNotice = undefined;
 			if (notice) yield notice;
 
-			// If provider header was exposed, notify UI so it can render "via {provider}".
-			if (providerHeader) {
-				yield {
-					type: MessageUpdateType.RouterMetadata,
-					route: "",
-					model: "",
-					provider: providerHeader as unknown as import("@huggingface/inference").InferenceProvider,
-				};
-				logger.debug({ provider: providerHeader }, "[mcp] provider metadata emitted");
-			}
-
 			const toolCallState: Record<number, { id?: string; name?: string; arguments: string }> = {};
 			let firstToolDeltaLogged = false;
 			let sawToolCall = false;
 			let tokenCount = 0;
 			let finishReason: string | null | undefined;
+			let providerShown = false;
 			for await (const chunk of completionStream) {
+				// On the first chunk, which names the provider serving a call routed through
+				// OpenRouter, so a stopped or failed stream still says what served it
+				if (!providerShown) {
+					providerShown = true;
+					const { provider: servedBy } = chunk as { provider?: unknown };
+					const servedProvider = servingProvider(
+						targetModel,
+						providerHeader,
+						typeof servedBy === "string" ? servedBy : undefined
+					);
+					if (servedProvider) {
+						yield {
+							type: MessageUpdateType.RouterMetadata,
+							route: "",
+							model: "",
+							provider: servedProvider,
+						};
+						logger.debug({ provider: servedProvider }, "[mcp] provider metadata emitted");
+					}
+				}
 				const choice = chunk.choices?.[0];
 				// Before the delta guard: the terminal chunk can carry only a finish_reason.
 				if (choice?.finish_reason) finishReason = choice.finish_reason;

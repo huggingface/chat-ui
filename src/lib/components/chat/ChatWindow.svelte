@@ -19,7 +19,8 @@
 	import IconCheap from "$lib/components/icons/IconCheap.svelte";
 	import IconFast from "$lib/components/icons/IconFast.svelte";
 	import CarbonCaretDown from "~icons/carbon/caret-down";
-	import { PROVIDERS_HUB_ORGS } from "@huggingface/inference";
+	import CarbonListNumbered from "~icons/carbon/list-numbered";
+	import { providerHubOrg } from "$lib/utils/providerHubOrg";
 	import { shownProvider } from "$lib/utils/shownProvider";
 	import CarbonDirectionRight from "~icons/carbon/direction-right-01";
 	import IconArrowUp from "~icons/lucide/arrow-up";
@@ -1592,8 +1593,7 @@
 									{/if}
 									<span class="truncate">{currentModel.displayName}</span>
 									{#if hasProviderOverride}
-										{@const hubOrg =
-											PROVIDERS_HUB_ORGS[providerOverride as keyof typeof PROVIDERS_HUB_ORGS]}
+										{@const hubOrg = providerHubOrg(providerOverride)}
 										<span
 											class="inline-flex shrink-0 items-center rounded-sm p-0.5 {providerOverride ===
 											'fastest'
@@ -1607,6 +1607,8 @@
 												<IconFast classNames="text-sm" />
 											{:else if providerOverride === "cheapest"}
 												<IconCheap classNames="text-sm" />
+											{:else if providerOverride === "preferred"}
+												<CarbonListNumbered class="text-sm" />
 											{:else if hubOrg}
 												<img
 													src="https://huggingface.co/api/avatars/{hubOrg}"

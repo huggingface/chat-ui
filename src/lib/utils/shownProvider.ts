@@ -4,7 +4,7 @@ export function shownProvider(
 	providerOverrides: Record<string, string> | undefined
 ): string | undefined {
 	if (model.isRouter) return undefined;
-	// a saved "auto" is a choice of the user's own Hub order, so it hides the default too
+	// a saved "auto" is a choice of the router's routing, so it hides the default too
 	const provider = providerOverrides?.[model.id] || model.defaultProvider;
 	return provider && provider !== "auto" ? provider : undefined;
 }
