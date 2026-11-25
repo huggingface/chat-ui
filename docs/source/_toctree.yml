@@ -32,6 +32,8 @@
       title: Running Locally
     - local: ml-intern/slack-bot
       title: Slack Bot
+    - local: ml-intern/headless-api
+      title: Headless Runs API
 - title: Developing
   sections:
     - local: developing/architecture
