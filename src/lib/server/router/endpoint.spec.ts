@@ -18,7 +18,7 @@ vi.mock("$lib/server/logger", () => ({
 }));
 vi.mock("./policy", () => ({ getRoutes: async () => [], resolveRouteModels: () => [] }));
 vi.mock("../models", () => ({
-	models: [
+	routingModels: [
 		{
 			id: "deepseek-ai/DeepSeek-V4.1-Flash-1017",
 			name: "deepseek-ai/DeepSeek-V4.1-Flash-1017",

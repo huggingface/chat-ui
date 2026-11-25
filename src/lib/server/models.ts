@@ -9,6 +9,7 @@ import { setMlAssistantCatalog } from "./mlAssistantModels";
 import { logger } from "$lib/server/logger";
 import { preservesReasoningByDefault } from "$lib/server/reasoningPolicy";
 import { makeRouterEndpoint } from "$lib/server/router/endpoint";
+import { dedupeById, droppedDuplicateIds } from "$lib/utils/dedupeById";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -218,6 +219,7 @@ const getModelOverrides = (): ModelOverride[] => {
 export type ProcessedModel = InternalProcessedModel;
 
 export let models: ProcessedModel[] = [];
+export let routingModels: ProcessedModel[] = [];
 export let defaultModel!: ProcessedModel;
 export let taskModel!: ProcessedModel;
 export let validModelIdSchema: z.ZodType<string> = z.string();
@@ -247,7 +249,10 @@ const resolveTaskModel = (modelList: ProcessedModel[]) => {
 	return modelList[0];
 };
 
-const buildModels = async (): Promise<ProcessedModel[]> => {
+const buildModels = async (): Promise<{
+	catalog: ProcessedModel[];
+	visible: ProcessedModel[];
+}> => {
 	if (!openaiBaseUrl) {
 		logger.error(
 			"OPENAI_BASE_URL is required. Set it to an OpenAI-compatible base (e.g., https://router.huggingface.co/v1)."
@@ -378,7 +383,14 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 			(config.LLM_ROUTER_ENABLE_MULTIMODAL || "").toLowerCase() === "true";
 		const routerToolsEnabled = (config.LLM_ROUTER_ENABLE_TOOLS || "").toLowerCase() === "true";
 
-		let decorated = builtModels as ProcessedModel[];
+		// Azure and some OpenAI-compatible catalogs repeat an id. {#each} keyed by
+		// model.id throws each_key_duplicate and the models/settings pages go blank.
+		const droppedIds = droppedDuplicateIds(builtModels);
+		if (droppedIds.length > 0) {
+			logger.warn({ ids: droppedIds }, "[models] dropped duplicate model ids");
+		}
+		const catalog = dedupeById(builtModels);
+		let visible = catalog;
 
 		if (routerRoutesPath) {
 			// Build a minimal model config for the alias
@@ -430,11 +442,11 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 				getEndpoint: async (): Promise<Endpoint> => makeRouterEndpoint(aliasModel),
 			} as ProcessedModel;
 
-			// Put alias first
-			decorated = [aliasModel, ...decorated];
+			// Let the alias take the visible slot without discarding its backing catalog row.
+			visible = [aliasModel, ...catalog.filter((model) => model.id !== aliasModel.id)];
 		}
 
-		return decorated;
+		return { catalog, visible };
 	} catch (e) {
 		logger.error(e, "Failed to load models from OpenAI base URL");
 		throw e;
@@ -446,12 +458,13 @@ const buildModels = async (): Promise<ProcessedModel[]> => {
 // The model list is built once at server startup; new models appear on redeploy.
 if (!building) {
 	const startedAt = Date.now();
-	const newModels = await buildModels();
-	if (newModels.length === 0) {
+	const { catalog, visible } = await buildModels();
+	if (visible.length === 0) {
 		throw new Error("Failed to load any models from upstream");
 	}
 
-	models = newModels;
+	routingModels = catalog;
+	models = visible;
 	setMlAssistantCatalog(() => models.map((model) => ({ id: model.id, isRouter: model.isRouter })));
 	defaultModel = models[0];
 	taskModel = resolveTaskModel(models);

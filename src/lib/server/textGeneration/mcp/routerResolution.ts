@@ -42,8 +42,7 @@ export async function resolveRouterTarget({
 	}
 
 	try {
-		const mod = await import("../../models");
-		const allModels = mod.models as ProcessedModel[];
+		const { routingModels: allModels } = await import("../../models");
 
 		// Multimodal bypass
 		if (hasImageInput) {
