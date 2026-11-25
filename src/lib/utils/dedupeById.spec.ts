@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dedupeById } from "./dedupeById";
+import { dedupeById, droppedDuplicateIds } from "./dedupeById";
 
 describe("dedupeById", () => {
 	it("keeps the first model when an upstream list repeats an id", () => {
@@ -12,6 +12,7 @@ describe("dedupeById", () => {
 			{ id: "gpt-4o", name: "first" },
 			{ id: "gpt-4o-mini", name: "mini" },
 		]);
+		expect(droppedDuplicateIds(models)).toEqual(["gpt-4o"]);
 	});
 
 	it("leaves a list of unique ids unchanged", () => {

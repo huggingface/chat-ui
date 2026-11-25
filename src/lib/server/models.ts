@@ -9,7 +9,7 @@ import { setMlAssistantCatalog } from "./mlAssistantModels";
 import { logger } from "$lib/server/logger";
 import { preservesReasoningByDefault } from "$lib/server/reasoningPolicy";
 import { makeRouterEndpoint } from "$lib/server/router/endpoint";
-import { dedupeById } from "$lib/utils/dedupeById";
+import { dedupeById, droppedDuplicateIds } from "$lib/utils/dedupeById";
 
 type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
@@ -249,7 +249,10 @@ const resolveTaskModel = (modelList: ProcessedModel[]) => {
 	return modelList[0];
 };
 
-const buildModels = async () => {
+const buildModels = async (): Promise<{
+	catalog: ProcessedModel[];
+	visible: ProcessedModel[];
+}> => {
 	if (!openaiBaseUrl) {
 		logger.error(
 			"OPENAI_BASE_URL is required. Set it to an OpenAI-compatible base (e.g., https://router.huggingface.co/v1)."
@@ -382,6 +385,10 @@ const buildModels = async () => {
 
 		// Azure and some OpenAI-compatible catalogs repeat an id. {#each} keyed by
 		// model.id throws each_key_duplicate and the models/settings pages go blank.
+		const droppedIds = droppedDuplicateIds(builtModels);
+		if (droppedIds.length > 0) {
+			logger.warn({ ids: droppedIds }, "[models] dropped duplicate model ids");
+		}
 		const catalog = dedupeById(builtModels);
 		let visible = catalog;
 
