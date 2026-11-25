@@ -13,3 +13,8 @@ export function paymentErrorNotice(errorCode: string | undefined): string | unde
 			return undefined;
 	}
 }
+
+/** a 402 that adding credits fixes, the other codes get their own toast */
+export function isOutOfCredits(statusCode: number | undefined, errorCode: string | undefined) {
+	return statusCode === 402 && paymentErrorNotice(errorCode) === undefined;
+}

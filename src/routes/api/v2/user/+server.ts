@@ -11,6 +11,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 					email: locals.user.email,
 					isAdmin: locals.user.isAdmin ?? false,
 					isEarlyAccess: locals.user.isEarlyAccess ?? false,
+					outOfCredits: Boolean(locals.user.outOfCreditsAt),
 				}
 			: null
 	);

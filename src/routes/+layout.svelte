@@ -25,6 +25,7 @@
 	import { handleResponse, useAPIClient } from "$lib/APIClient";
 	import { isAborted } from "$lib/stores/isAborted";
 	import { isPro } from "$lib/stores/isPro";
+	import { outOfCredits } from "$lib/stores/outOfCredits";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { createConversationsStore } from "$lib/stores/conversations.svelte";
 	import { createActiveGenerationsStore } from "$lib/stores/activeGenerations.svelte";
@@ -159,6 +160,8 @@
 		// so when initWithServers sets mcpServersLoaded=true synchronously here, the
 		// subscriber resolves immediately without any added network latency.
 		initWithServers(data.mcpBaseServers ?? []);
+
+		if (publicConfig.isHuggingChat && data.user?.outOfCredits) outOfCredits.set(true);
 
 		if (publicConfig.isHuggingChat && data.user?.username) {
 			fetch(`https://huggingface.co/api/users/${data.user.username}/overview`)

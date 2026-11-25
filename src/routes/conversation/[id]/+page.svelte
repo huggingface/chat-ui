@@ -37,8 +37,9 @@
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
-	import SubscribeModal from "$lib/components/SubscribeModal.svelte";
-	import { paymentErrorNotice } from "$lib/utils/paymentErrors";
+	import OutOfCreditsModal from "$lib/components/OutOfCreditsModal.svelte";
+	import { isOutOfCredits, paymentErrorNotice } from "$lib/utils/paymentErrors";
+	import { outOfCredits } from "$lib/stores/outOfCredits";
 	import { loading } from "$lib/stores/loading.js";
 	import { streamStart } from "$lib/utils/haptics";
 	import { requireAuthUser } from "$lib/utils/auth.js";
@@ -67,13 +68,16 @@
 	/** A resumed call streams into the message that parked, so it needs no placeholder. */
 	let resuming = $state(false);
 	let initialRun = true;
-	let showSubscribeModal = $state(false);
+	let showOutOfCreditsModal = $state(false);
 
 	function showPaymentError(update: { statusCode?: number; errorCode?: string }): boolean {
 		if (update.statusCode !== 402) return false;
-		const notice = paymentErrorNotice(update.errorCode);
-		if (notice) $error = notice;
-		else showSubscribeModal = true;
+		if (isOutOfCredits(update.statusCode, update.errorCode)) {
+			$outOfCredits = true;
+			showOutOfCreditsModal = true;
+		} else {
+			$error = paymentErrorNotice(update.errorCode) ?? "An error has occurred";
+		}
 		return true;
 	}
 	// Conversation-scoped stop tombstone. A boolean reset on page.params.id
@@ -431,6 +435,7 @@
 				isAborted: () => $isAborted,
 				onAbort: () => messageUpdatesAbortController.abort(),
 				onStreamStart: () => {
+					$outOfCredits = false;
 					if (pending) streamStart();
 					pending = false;
 					resuming = false;
@@ -971,6 +976,6 @@
 	currentModel={findCurrentModel(data.models, data.oldModels, data.model)}
 />
 
-{#if showSubscribeModal}
-	<SubscribeModal close={() => (showSubscribeModal = false)} />
+{#if showOutOfCreditsModal}
+	<OutOfCreditsModal close={() => (showOutOfCreditsModal = false)} />
 {/if}

@@ -33,6 +33,8 @@ import type { McpElicitation } from "$lib/types/McpElicitation";
 import { isMlAssistantConversation } from "$lib/server/mlAssistant";
 import { requestProvider } from "$lib/server/requestProvider";
 import { upstreamErrorCode } from "$lib/server/endpoints/openai/providerFallback";
+import { isOutOfCredits } from "$lib/utils/paymentErrors";
+import { clearOutOfCredits, markOutOfCredits } from "$lib/server/outOfCredits";
 import { stampMlHarness } from "$lib/server/mlAssistantHarness";
 import { ML_ASSISTANT_EFFORT } from "$lib/constants/mlAssistant";
 import { logger } from "$lib/server/logger.js";
@@ -844,6 +846,9 @@ export async function generateConversationResponse({
 						...(errorCode && { errorCode }),
 					});
 					logger.error(err, "Error in conversation stream");
+					if (locals.user && isOutOfCredits(statusCode, errorCode)) {
+						await markOutOfCredits(locals.user._id);
+					}
 				}
 			} finally {
 				// check if no output was generated
@@ -879,6 +884,9 @@ export async function generateConversationResponse({
 					type: MessageUpdateType.Status,
 					status: MessageUpdateStatus.Finished,
 				});
+			}
+			if (!hasError && !abortedByUser && locals.user) {
+				await clearOutOfCredits(locals.user._id);
 			}
 
 			// CAS: misses when a park moved the state on mid-run, and the parked
