@@ -1,3 +1,5 @@
+import { CREDIT_ESTIMATE_USD } from "./creditEstimate";
+
 export const ADD_CREDITS_URL = "https://huggingface.co/settings/billing?add-credits=true";
 export const UPGRADE_PRO_URL = "https://huggingface.co/subscribe/pro?from=HuggingChat";
 
@@ -5,6 +7,7 @@ export interface CreditsAction {
 	label: string;
 	href: string;
 	external: boolean;
+	hint?: string;
 }
 
 export interface OutOfCreditsCopy {
@@ -43,12 +46,19 @@ export function outOfCreditsCopy({
 		title: "You're out of credits",
 		body:
 			isPro === true
-				? "HuggingChat runs models on Hugging Face Inference Providers, paid for with your account's credits. You've used them all, so your message wasn't answered. Add credits, then retry your message."
-				: "HuggingChat runs models on Hugging Face Inference Providers, paid for with your account's credits, and your account has none left. Add credits to keep chatting, or upgrade to PRO to get monthly credits included.",
+				? "HuggingChat runs on your Inference Providers credits, and you've used them all. Add credits, then retry your message. You pay provider rates, with no markup."
+				: "HuggingChat runs on your Inference Providers credits, and your account has none left. Add credits to keep chatting. You pay provider rates, with no markup.",
 		notice: "You're out of credits, so messages can't be answered.",
 		primary: addCredits,
 		...(isPro === true
 			? {}
-			: { secondary: { label: "Upgrade to PRO", href: UPGRADE_PRO_URL, external: true } }),
+			: {
+					secondary: {
+						label: "Upgrade to PRO",
+						hint: `$${CREDIT_ESTIMATE_USD} credits monthly`,
+						href: UPGRADE_PRO_URL,
+						external: true,
+					},
+				}),
 	};
 }

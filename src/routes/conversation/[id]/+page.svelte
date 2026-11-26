@@ -69,16 +69,29 @@
 	let resuming = $state(false);
 	let initialRun = true;
 	let showOutOfCreditsModal = $state(false);
+	let outOfCreditsModel: { id: string; providerOverride?: string } | undefined = $state();
 
 	function showPaymentError(update: { statusCode?: number; errorCode?: string }): boolean {
 		if (update.statusCode !== 402) return false;
 		if (isOutOfCredits(update.statusCode, update.errorCode)) {
 			$outOfCredits = true;
+			outOfCreditsModel = failedModel();
 			showOutOfCreditsModal = true;
 		} else {
 			$error = paymentErrorNotice(update.errorCode) ?? "An error has occurred";
 		}
 		return true;
+	}
+
+	/** omni only routes to its models default providers */
+	function failedModel(): { id: string; providerOverride?: string } | undefined {
+		const current = findCurrentModel(data.models, data.oldModels, data.model);
+		if (!current) return undefined;
+		if (!current.isRouter) {
+			return { id: current.id, providerOverride: $settings.providerOverrides?.[current.id] };
+		}
+		const routed = messagesPath.findLast((msg) => msg.routerMetadata?.model)?.routerMetadata;
+		return routed ? { id: routed.model } : undefined;
 	}
 	// Conversation-scoped stop tombstone. A boolean reset on page.params.id
 	// changes resurrects the generating UI: invalidation reassigns page.params,
@@ -977,5 +990,5 @@
 />
 
 {#if showOutOfCreditsModal}
-	<OutOfCreditsModal close={() => (showOutOfCreditsModal = false)} />
+	<OutOfCreditsModal model={outOfCreditsModel} close={() => (showOutOfCreditsModal = false)} />
 {/if}
