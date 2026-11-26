@@ -1,83 +1,142 @@
 <script lang="ts">
 	import Modal from "$lib/components/Modal.svelte";
 	import { isPro } from "$lib/stores/isPro";
-	import IconPro from "$lib/components/icons/IconPro.svelte";
-	import IconDazzled from "$lib/components/icons/IconDazzled.svelte";
+	import { useAPIClient, handleResponse } from "$lib/APIClient";
+	import {
+		CREDIT_ESTIMATE_USD,
+		estimateTokens,
+		formatTokenCount,
+		type ProviderPricing,
+	} from "$lib/utils/creditEstimate";
+	import LucideCoins from "~icons/lucide/coins";
+	import CarbonArrowRight from "~icons/carbon/arrow-right";
 
 	interface Props {
 		close: () => void;
+		/** model the failed request ran on, prices the credits to tokens estimate */
+		model?: { id: string; providerOverride?: string };
 	}
 
-	let { close }: Props = $props();
+	let { close, model }: Props = $props();
+
+	const client = useAPIClient();
+	let estimate: { modelName: string; tokens: number } | undefined = $state();
+
+	$effect(() => {
+		estimate = undefined;
+		if (!model) return;
+		const { id, providerOverride } = model;
+		let stale = false;
+		client
+			.models({ id })
+			.get()
+			.then(handleResponse)
+			.then(
+				(
+					detail: {
+						displayName?: string;
+						defaultProvider?: string;
+						providers?: ProviderPricing[];
+					} | null
+				) => {
+					if (stale || !detail) return;
+					const tokens = estimateTokens(detail.providers, {
+						providerOverride,
+						defaultProvider: detail.defaultProvider,
+					});
+					if (tokens !== undefined) estimate = { modelName: detail.displayName ?? id, tokens };
+				}
+			)
+			// the modal still works without the estimate
+			.catch(() => {});
+		return () => {
+			stale = true;
+		};
+	});
 </script>
 
 <Modal closeOnBackdrop={false} onclose={close} width="max-w-[420px]! m-4!">
 	<div
-		class="flex w-full flex-col gap-8 bg-white bg-linear-to-b to-transparent px-6 pb-7 dark:bg-black dark:from-white/10 dark:to-white/5"
+		class="flex w-full flex-col gap-6 bg-white bg-linear-to-b to-transparent px-6 pb-6 dark:bg-black dark:from-white/10 dark:to-white/5"
 	>
 		<div
-			class="-mx-6 grid h-48 place-items-center bg-linear-to-t from-black/5 select-none dark:from-white/10"
+			class="-mx-6 grid h-44 place-items-center bg-linear-to-t from-black/5 select-none dark:from-white/10"
 		>
 			<div class="flex flex-col items-center justify-center gap-2.5 px-8 text-center">
 				<div
-					class="flex size-14 items-center justify-center rounded-full text-3xl {$isPro
+					class="flex size-14 items-center justify-center rounded-full text-2xl text-amber-600 dark:text-amber-400 {$isPro
 						? 'bg-linear-to-br from-yellow-500/15 via-orange-500/15 to-red-500/15'
 						: 'bg-linear-to-br from-pink-500/15 from-15% via-green-500/15 to-yellow-500/15'}"
 				>
-					{#if $isPro}
-						<IconDazzled />
-					{:else}
-						<IconPro classNames="mr-0!" />
-					{/if}
+					<LucideCoins />
 				</div>
-				<h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-					{$isPro ? "Out of Credits" : "Upgrade Required"}
-				</h2>
+				<h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">Out of credits</h2>
 			</div>
 		</div>
 
 		<div class="text-gray-700 dark:text-gray-200">
-			{#if $isPro}
-				<p class="text-[15px] leading-relaxed">
-					You've used all your available credits. Purchase additional credits to continue using
-					HuggingChat.
-				</p>
-				<p class="mt-3 text-[15px] leading-relaxed italic opacity-75">
-					Your credits can be used in other HF services and external apps via Inference Providers.
-				</p>
-			{:else}
-				<p class="text-[15px] leading-relaxed">
-					You've reached your message limit. Upgrade to Hugging Face PRO to continue using
-					HuggingChat.
-				</p>
-				<p class="mt-3 text-[15px] leading-relaxed italic opacity-75">
-					It's also possible to use your PRO credits in your favorite AI tools.
-				</p>
+			<p class="text-[15px] leading-relaxed">
+				{#if $isPro}
+					You've used all your available credits. Add credits to keep using HuggingChat.
+				{:else}
+					Add credits to keep using HuggingChat. You pay provider rates, with no markup.
+				{/if}
+			</p>
+
+			{#if estimate}
+				<div
+					class="mt-4 rounded-xl bg-gray-100 px-4 py-3 dark:bg-white/5"
+					data-testid="credit-estimate"
+				>
+					<div class="flex items-center justify-center gap-4">
+						<div class="flex flex-col items-center">
+							<span class="text-2xl font-semibold text-gray-900 dark:text-gray-100"
+								>${CREDIT_ESTIMATE_USD}</span
+							>
+							<span class="text-xs text-gray-500 dark:text-gray-400">credits</span>
+						</div>
+						<CarbonArrowRight class="text-gray-400 dark:text-gray-500" />
+						<div class="flex flex-col items-center">
+							<span class="text-2xl font-semibold text-gray-900 dark:text-gray-100"
+								>~{formatTokenCount(estimate.tokens)}</span
+							>
+							<span class="text-xs text-gray-500 dark:text-gray-400">tokens</span>
+						</div>
+					</div>
+					<p
+						class="mt-1.5 truncate text-center font-mono text-xs text-gray-600 dark:text-gray-300"
+						title={estimate.modelName}
+					>
+						{estimate.modelName}
+					</p>
+				</div>
 			{/if}
 		</div>
 
 		<div class="flex flex-col gap-2.5">
-			{#if $isPro}
-				<a
-					href="https://huggingface.co/settings/billing?add-credits=true"
-					target="_blank"
-					rel="noopener noreferrer"
-					class="w-full rounded-xl bg-black px-5 py-2.5 text-center text-base font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-				>
-					Purchase Credits
-				</a>
-			{:else}
+			<a
+				href="https://huggingface.co/settings/billing?add-credits=true"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="w-full rounded-xl bg-black px-5 py-2.5 text-center text-base font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+			>
+				Add credits
+			</a>
+			{#if !$isPro}
 				<a
 					href="https://huggingface.co/subscribe/pro?from=HuggingChat"
 					target="_blank"
 					rel="noopener noreferrer"
-					class="w-full rounded-xl bg-black px-5 py-2.5 text-center text-base font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+					class="w-full rounded-xl border border-gray-300 px-5 py-2.5 text-center text-base font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-white/5"
 				>
-					Upgrade to Pro
+					Upgrade to PRO
+					<span class="font-normal text-gray-500 dark:text-gray-400"
+						>· ${CREDIT_ESTIMATE_USD} credits monthly</span
+					>
 				</a>
 			{/if}
 			<button
-				class="w-full rounded-xl bg-gray-200 px-5 py-2.5 text-base font-medium text-gray-700 hover:bg-gray-300/80 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
+				class="w-full py-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
 				onclick={close}
 			>
 				Maybe later
