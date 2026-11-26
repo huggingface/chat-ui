@@ -39,6 +39,8 @@
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
 	import ResumeBtn from "../ResumeBtn.svelte";
+	import OutOfCreditsNotice from "./OutOfCreditsNotice.svelte";
+	import { outOfCredits } from "$lib/stores/outOfCredits";
 	import {
 		buildResumeMessage,
 		canResumeAfterFailure,
@@ -1401,6 +1403,11 @@
 							/>
 						{/if}
 					</div>
+					{#if $outOfCredits && publicConfig.isHuggingChat && !shared && !isReadOnly && !loading}
+						<div class="mb-3 flex w-full justify-center">
+							<OutOfCreditsNotice />
+						</div>
+					{/if}
 					{#if mlTaskRunning}
 						<QueuedInputs
 							items={queuedInputs.items}
@@ -1474,7 +1481,9 @@
 								>
 									{#if lastIsError}
 										<ChatInput
-											value="Sorry, something went wrong. Please try again."
+											value={$outOfCredits && publicConfig.isHuggingChat
+												? "Out of credits. Add credits, then press Retry."
+												: "Sorry, something went wrong. Please try again."}
 											disabled={true}
 										/>
 									{:else}

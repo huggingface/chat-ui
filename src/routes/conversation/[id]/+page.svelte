@@ -37,8 +37,9 @@
 	import type { TreeNode, TreeId } from "$lib/utils/tree/tree";
 	import "katex/dist/katex.min.css";
 	import { updateDebouncer } from "$lib/utils/updates.js";
-	import SubscribeModal from "$lib/components/SubscribeModal.svelte";
-	import { paymentErrorNotice } from "$lib/utils/paymentErrors";
+	import OutOfCreditsModal from "$lib/components/OutOfCreditsModal.svelte";
+	import { isOutOfCredits, paymentErrorNotice } from "$lib/utils/paymentErrors";
+	import { outOfCredits } from "$lib/stores/outOfCredits";
 	import { loading } from "$lib/stores/loading.js";
 	import { streamStart } from "$lib/utils/haptics";
 	import { requireAuthUser } from "$lib/utils/auth.js";
@@ -67,14 +68,30 @@
 	/** A resumed call streams into the message that parked, so it needs no placeholder. */
 	let resuming = $state(false);
 	let initialRun = true;
-	let showSubscribeModal = $state(false);
+	let showOutOfCreditsModal = $state(false);
+	let outOfCreditsModel: { id: string; providerOverride?: string } | undefined = $state();
 
 	function showPaymentError(update: { statusCode?: number; errorCode?: string }): boolean {
 		if (update.statusCode !== 402) return false;
-		const notice = paymentErrorNotice(update.errorCode);
-		if (notice) $error = notice;
-		else showSubscribeModal = true;
+		if (isOutOfCredits(update.statusCode, update.errorCode)) {
+			$outOfCredits = true;
+			outOfCreditsModel = failedModel();
+			showOutOfCreditsModal = true;
+		} else {
+			$error = paymentErrorNotice(update.errorCode) ?? "An error has occurred";
+		}
 		return true;
+	}
+
+	/** omni only routes to its models default providers */
+	function failedModel(): { id: string; providerOverride?: string } | undefined {
+		const current = findCurrentModel(data.models, data.oldModels, data.model);
+		if (!current) return undefined;
+		if (!current.isRouter) {
+			return { id: current.id, providerOverride: $settings.providerOverrides?.[current.id] };
+		}
+		const routed = messagesPath.findLast((msg) => msg.routerMetadata?.model)?.routerMetadata;
+		return routed ? { id: routed.model } : undefined;
 	}
 	// Conversation-scoped stop tombstone. A boolean reset on page.params.id
 	// changes resurrects the generating UI: invalidation reassigns page.params,
@@ -431,6 +448,7 @@
 				isAborted: () => $isAborted,
 				onAbort: () => messageUpdatesAbortController.abort(),
 				onStreamStart: () => {
+					$outOfCredits = false;
 					if (pending) streamStart();
 					pending = false;
 					resuming = false;
@@ -971,6 +989,6 @@
 	currentModel={findCurrentModel(data.models, data.oldModels, data.model)}
 />
 
-{#if showSubscribeModal}
-	<SubscribeModal close={() => (showSubscribeModal = false)} />
+{#if showOutOfCreditsModal}
+	<OutOfCreditsModal model={outOfCreditsModel} close={() => (showOutOfCreditsModal = false)} />
 {/if}

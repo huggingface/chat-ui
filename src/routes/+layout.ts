@@ -21,6 +21,7 @@ interface UserInfo {
 	email?: string;
 	isAdmin: boolean;
 	isEarlyAccess: boolean;
+	outOfCredits?: boolean;
 }
 
 interface SettingsResponse {

@@ -13,4 +13,6 @@ export interface User extends Timestamps {
 	slackBotTeamId?: string;
 	isAdmin?: boolean;
 	isEarlyAccess?: boolean;
+	/** set by an out of credits 402, cleared by the next completed turn */
+	outOfCreditsAt?: Date;
 }
