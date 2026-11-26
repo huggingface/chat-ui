@@ -25,7 +25,9 @@ afterEach(() => sidePane.reset());
 describe("TrackioPane view capture", () => {
 	it("offers Add to chat only once its own dashboard says it can", async () => {
 		sidePane.openTrackio(DASH, "me/mnist-trackio");
-		const { container } = render(TrackioPane, { items });
+		const tab = sidePane.active;
+		if (tab?.kind !== "trackio") throw new Error("no trackio tab");
+		const { container } = render(TrackioPane, { items, tab });
 		await tick();
 		const frame = container.querySelector("iframe") as HTMLIFrameElement;
 		expect(addButton(container)).toBeUndefined();

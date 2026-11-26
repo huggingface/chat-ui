@@ -12,6 +12,7 @@
 	import { findCurrentModel } from "$lib/utils/models";
 	import type { Message } from "$lib/types/Message";
 	import type { TrackioDashboardView } from "$lib/utils/trackioView";
+	import type { PaperQuote } from "$lib/utils/paper";
 	import { saveComposerDraft, takeComposerDraft } from "$lib/stores/composerDrafts";
 	import { useConversationsStore } from "$lib/stores/conversations.svelte";
 	import file2base64 from "$lib/utils/file2base64";
@@ -124,6 +125,7 @@
 	let draft = $state(initialDraft.draft);
 	let files: File[] = $state(initialDraft.files);
 	let dashboardViews: TrackioDashboardView[] = $state(initialDraft.dashboardViews);
+	let paperQuotes: PaperQuote[] = $state(initialDraft.paperQuotes);
 	let composerFor = untrack(() => convId);
 
 	function stashComposer(conversationId: string) {
@@ -131,6 +133,7 @@
 			draft,
 			files: [...files],
 			dashboardViews: [...dashboardViews],
+			paperQuotes: [...paperQuotes],
 		});
 	}
 
@@ -139,7 +142,7 @@
 		untrack(() => {
 			if (id === composerFor) return;
 			stashComposer(composerFor);
-			({ draft, files, dashboardViews } = takeComposerDraft(id));
+			({ draft, files, dashboardViews, paperQuotes } = takeComposerDraft(id));
 			composerFor = id;
 		});
 	});
@@ -257,6 +260,8 @@
 			// when the user pressed send. A retry re-sends what the message already has.
 			const sentViews: TrackioDashboardView[] =
 				isRetry || resumeElicitationId ? [] : $state.snapshot(dashboardViews);
+			const sentQuotes: PaperQuote[] =
+				isRetry || resumeElicitationId ? [] : $state.snapshot(paperQuotes);
 			const base64Files = await Promise.all(
 				(files ?? []).map((file) =>
 					file2base64(file).then((value) => ({
@@ -303,6 +308,9 @@
 							...(messageToRetry.dashboardViews?.length
 								? { dashboardViews: messageToRetry.dashboardViews }
 								: {}),
+							...(messageToRetry.paperQuotes?.length
+								? { paperQuotes: messageToRetry.paperQuotes }
+								: {}),
 						},
 						messageId
 					);
@@ -339,6 +347,7 @@
 						content: prompt ?? "",
 						files: base64Files,
 						...(sentViews.length ? { dashboardViews: sentViews } : {}),
+						...(sentQuotes.length ? { paperQuotes: sentQuotes } : {}),
 					},
 					messageId
 				);
@@ -398,6 +407,7 @@
 					generationId: activeGenerationId,
 					files: isRetry ? userMessage?.files : base64Files,
 					dashboardViews: sentViews,
+					paperQuotes: sentQuotes,
 					selectedMcpServerNames: $enabledServers.map((s) => s.name),
 					selectedMcpServers: $enabledServers.map((s) => ({
 						name: s.name,
@@ -427,6 +437,7 @@
 			// unconditional clear here would wipe that restored queue.
 			if (base64Files.length > 0) files = [];
 			if (sentViews.length > 0) dashboardViews = [];
+			if (sentQuotes.length > 0) paperQuotes = [];
 
 			streamedMessage = messageToWriteTo;
 			await consumeMessageUpdates(messageUpdatesIterator, messageToWriteTo, {
@@ -965,6 +976,7 @@
 	bind:draft
 	bind:files
 	bind:dashboardViews
+	bind:paperQuotes
 	onmessage={onMessage}
 	onretry={onRetry}
 	onshowAlternateMsg={onShowAlternateMsg}

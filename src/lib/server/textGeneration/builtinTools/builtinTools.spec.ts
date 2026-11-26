@@ -45,6 +45,8 @@ describe("getEnabledBuiltinTools", () => {
 			"check_job",
 			"create_trackio",
 			"read_trackio",
+			"open_paper",
+			"read_paper",
 			"create_workflow",
 			"write_file",
 			"edit_file",

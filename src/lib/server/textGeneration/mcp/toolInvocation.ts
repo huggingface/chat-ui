@@ -14,6 +14,7 @@ import {
 } from "$lib/server/mcp/httpClient";
 import { getClient } from "$lib/server/mcp/clientPool";
 import type { BuiltinTool } from "../builtinTools/types";
+import { withJobFailedNote } from "../builtinTools/jobCheckPrompt";
 import { openDurableElicitation, type ElicitationSink } from "$lib/server/mcp/elicitation";
 import { turnAwaitingInput } from "$lib/server/generation/turnState";
 import { slimToolOutput } from "$lib/server/generation/compressUpdates";
@@ -784,7 +785,11 @@ export async function* executeToolCalls({
 		if (!r.error) {
 			const output = r.output ?? "";
 			toolRuns.push({ name, parameters: r.paramsClean, output });
-			toolMessages.push({ role: "tool", tool_call_id: id, content: output });
+			toolMessages.push({
+				role: "tool",
+				tool_call_id: id,
+				content: withJobFailedNote(name, output),
+			});
 			const blocks = toolImageBlocks(r.blocks);
 			if (blocks.length > 0) images.push({ toolCallId: id, tool: name, blocks });
 		} else {

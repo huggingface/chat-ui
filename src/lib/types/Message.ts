@@ -1,5 +1,5 @@
 import type { TrackioDashboardView } from "$lib/utils/trackioView";
-import type { InferenceProvider } from "@huggingface/inference";
+import type { PaperQuote } from "$lib/utils/paper";
 import type { MessageUpdate } from "./MessageUpdate";
 import type { Timestamps } from "./Timestamps";
 import type { v4 } from "uuid";
@@ -36,13 +36,15 @@ export type Message = Partial<Timestamps> & {
 	 **/
 	files?: MessageFile[];
 	dashboardViews?: TrackioDashboardView[];
+	/** passages the user attached from the paper reader, checked by the server */
+	paperQuotes?: PaperQuote[];
 	interrupted?: boolean;
 
 	// Router metadata when using llm-router
 	routerMetadata?: {
 		route: string;
 		model: string;
-		provider?: InferenceProvider;
+		provider?: string;
 	};
 
 	/** what the latest run ran under, ml assistant only, never sent to the model */

@@ -28,9 +28,31 @@ describe("marked basic rendering", () => {
 		expect(html).toContain("link</a>");
 	});
 
+	test("renders a paper citation as a page tag, page 1 when none is given", () => {
+		const cited = renderHtml('[p. 5](paper:1706.03762v7#p5 "exact words")');
+		expect(cited).toContain('data-paper-cite="1706.03762" data-page="5"');
+		expect(cited).toContain('data-quote="exact words"');
+		const bare = renderHtml("[1706.03762](paper:1706.03762)");
+		expect(bare).toContain('data-paper-cite="1706.03762" data-page="1"');
+		expect(bare).not.toContain('target="_blank"');
+	});
+
+	test("never hands an unreadable paper link on as a URL", () => {
+		const html = renderHtml("[x](paper:a:b)");
+		expect(html).not.toContain("<a");
+		expect(html).toContain("<span>x</span>");
+	});
+
 	test("renders paragraphs", () => {
 		const html = renderHtml("hello world");
 		expect(html).toContain("<p>hello world</p>");
+	});
+
+	test("wraps tables in a horizontal scroll container", () => {
+		const html = renderHtml("| a | b |\n|---|--:|\n| 1 | 2 |");
+		expect(html).toMatch(/^<div class="table-scroll"><table>[\s\S]*<\/table><\/div>\s*$/);
+		expect(html).toContain("<thead>");
+		expect(html).toContain('<tbody><tr>\n<td>1</td>\n<td align="right">2</td>');
 	});
 });
 

@@ -14,6 +14,7 @@ import {
 	JOB_CHECK_DELEGATION_DOCTRINE,
 	JOB_CHECK_ITERATION_LIMIT_PROMPT,
 	JOB_CHECK_REPETITION_PROMPT,
+	JOB_CHECK_TOOL_NAME,
 	jobCheckSystemPrompt,
 } from "./jobCheckPrompt";
 import { createReadOnlyJobsGuard } from "./readOnlyJobsGuard";
@@ -21,7 +22,7 @@ import type { BuiltinTool, BuiltinToolContext, BuiltinToolResult } from "./types
 
 /** Reads a running job and returns a verdict, so its log tails stay out of the parent. */
 
-export const JOB_CHECK_TOOL_NAME = "check_job";
+export { JOB_CHECK_TOOL_NAME };
 
 /** Reading operations only, enforced by the guard below — see readOnlyJobsGuard. */
 // read_file only reads the conversation store, so it needs no guard

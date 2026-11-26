@@ -69,6 +69,7 @@ import type { McpServerConfig } from "$lib/server/mcp/httpClient";
 import type { PlanStep } from "$lib/types/Plan";
 import type { Conversation } from "$lib/types/Conversation";
 import { fetchWithProviderFallback } from "$lib/server/endpoints/openai/providerFallback";
+import { servingProvider } from "$lib/server/endpoints/openai/servingProvider";
 import {
 	isMlAssistantConversation,
 	mlAssistantPayerTarget,
@@ -82,6 +83,7 @@ import { routedProvider } from "$lib/server/requestProvider";
 import { createMlBudgetGuard } from "$lib/server/mlBudget/guard";
 import { createMlRecordingGuard } from "$lib/server/mlRegistry/recordingGuard";
 import { createMlSourcesGuard } from "$lib/server/mlRegistry/sourcesGuard";
+import { createSandboxFirstGuard } from "$lib/server/mlRegistry/sandboxFirstGuard";
 import { PARENT_READER } from "$lib/types/MlSource";
 import { mlJobLabelsEnabled, mlServiceEventsEnabled } from "$lib/server/mlRegistry/enabled";
 import { markHarnessEventDelivered, pendingHarnessEvent } from "$lib/server/mlRegistry/midTurn";
@@ -325,6 +327,9 @@ export async function* runMcpFlow({
 	// Built here so it spans the turn's rounds; chained below, once the tool
 	// mapping the schema check reads exists.
 	const repeatedCallGuard = createRepeatedCallGuard();
+	const sandboxFirstGuard = mlAssistant
+		? createSandboxFirstGuard({ conversationId: conv._id })
+		: undefined;
 
 	// Start from env-configured servers
 	let servers = getMcpServers();
@@ -625,6 +630,10 @@ export async function* runMcpFlow({
 		const guard = [
 			repeatedCallGuard,
 			createSchemaPreflightGuard(mapping),
+			// it asks for a sandbox, so it applies only where one can be created
+			...(sandboxFirstGuard && Object.values(mapping).some((m) => m.tool === "hf_sandbox")
+				? [sandboxFirstGuard]
+				: []),
 			...(recordingGuard ? [recordingGuard] : []),
 			...(sourcesGuardFor ? [sourcesGuardFor(PARENT_READER)] : []),
 			...(budgetGuard ? [budgetGuard] : []),
@@ -656,8 +665,9 @@ export async function* runMcpFlow({
 			const res = await fetchWithProviderFallback(input, init, targetModel, {
 				defaultPin: requested.providerIsDefault,
 			});
+			// Each tool round's own, as rounds and fallbacks can be served by different providers
 			const p = res.headers.get("x-inference-provider");
-			if (p && !providerHeader) providerHeader = p;
+			if (p) providerHeader = p;
 			return res;
 		};
 
@@ -934,23 +944,33 @@ export async function* runMcpFlow({
 			pendingNotice = undefined;
 			if (notice) yield notice;
 
-			// If provider header was exposed, notify UI so it can render "via {provider}".
-			if (providerHeader) {
-				yield {
-					type: MessageUpdateType.RouterMetadata,
-					route: "",
-					model: "",
-					provider: providerHeader as unknown as import("@huggingface/inference").InferenceProvider,
-				};
-				logger.debug({ provider: providerHeader }, "[mcp] provider metadata emitted");
-			}
-
 			const toolCallState: Record<number, { id?: string; name?: string; arguments: string }> = {};
 			let firstToolDeltaLogged = false;
 			let sawToolCall = false;
 			let tokenCount = 0;
 			let finishReason: string | null | undefined;
+			let providerShown = false;
 			for await (const chunk of completionStream) {
+				// On the first chunk, which names the provider serving a call routed through
+				// OpenRouter, so a stopped or failed stream still says what served it
+				if (!providerShown) {
+					providerShown = true;
+					const { provider: servedBy } = chunk as { provider?: unknown };
+					const servedProvider = servingProvider(
+						targetModel,
+						providerHeader,
+						typeof servedBy === "string" ? servedBy : undefined
+					);
+					if (servedProvider) {
+						yield {
+							type: MessageUpdateType.RouterMetadata,
+							route: "",
+							model: "",
+							provider: servedProvider,
+						};
+						logger.debug({ provider: servedProvider }, "[mcp] provider metadata emitted");
+					}
+				}
 				const choice = chunk.choices?.[0];
 				// Before the delta guard: the terminal chunk can carry only a finish_reason.
 				if (choice?.finish_reason) finishReason = choice.finish_reason;

@@ -7,6 +7,7 @@ import { getReturnFromGenerator } from "$lib/utils/getReturnFromGenerator";
 import { stripThink } from "$lib/utils/stripThink";
 import { plainMentions } from "$lib/utils/mentionTokens";
 import { plainViewText } from "$lib/utils/trackioView";
+import { plainQuoteText } from "$lib/utils/paper";
 
 export async function* generateTitleForConversation(
 	conv: Conversation,
@@ -31,7 +32,7 @@ export async function* generateTitleForConversation(
 			const requestStart = content.indexOf(boundary);
 			if (requestStart !== -1) content = content.slice(requestStart + boundary.length);
 		}
-		const prompt = plainViewText(plainMentions(content));
+		const prompt = plainQuoteText(plainViewText(plainMentions(content)));
 		const modelForTitle = config.TASK_MODEL?.trim() ? config.TASK_MODEL : conv.model;
 		const title = (await generateTitle(prompt, modelForTitle, locals)) ?? "New Chat";
 

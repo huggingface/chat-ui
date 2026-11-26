@@ -32,6 +32,7 @@ import plaintext from "highlight.js/lib/languages/plaintext";
 import { parseIncompleteMarkdown } from "./parseIncompleteMarkdown";
 import { parseMarkdownIntoBlocks } from "./parseBlocks";
 import { escapeHTML, type BlockToken, type Token } from "./markedLight";
+import { parsePaperHref } from "./paperHref";
 
 // Re-export the light pieces so existing consumers of this module (the worker,
 // tests) keep a single import site. Main-thread code must import them from
@@ -378,6 +379,19 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 				if (href === "streamdown:incomplete-link") {
 					return `<a data-incomplete-link>${text}</a>`;
 				}
+				// A citation into a paper open in the reader: the click is handled by
+				// the message, which opens the paper's tab at the passage.
+				const cite = href ? parsePaperHref(href) : null;
+				if (cite) {
+					return `<a href="#p${cite.page}" class="paper-cite" data-paper-cite="${escapeHTML(
+						cite.paperId
+					)}" data-page="${cite.page}"${
+						title ? ` data-quote="${escapeHTML(title)}" title="${escapeHTML(title)}"` : ""
+					}>${text}</a>`;
+				}
+				// Any other `paper:` link names nothing the reader can open; never
+				// hand it on as a URL.
+				if (href && /^\s*paper:/i.test(href)) return `<span>${text}</span>`;
 				const safeHref = sanitizeHref(href);
 				return safeHref
 					? `<a href="${escapeHTML(safeHref)}" target="_blank" rel="noreferrer">${text}</a>`
@@ -400,6 +414,12 @@ function createMarkedInstance(sources: SimpleSource[]): Marked {
 				return `<img src="${safeSrc}" alt="${safeAlt}"${safeTitle} />`;
 			},
 			html: (html) => sanitizeHtmlForMultimedia(html),
+			// The wrapper scrolls wide tables horizontally (see `.table-scroll` in main.css), so
+			// the table itself can stay `display: table` and stretch to the prose width.
+			table: (header, body) =>
+				`<div class="table-scroll"><table>\n<thead>\n${header}</thead>\n${
+					body ? `<tbody>${body}</tbody>` : ""
+				}</table></div>\n`,
 		},
 		gfm: true,
 		breaks: true,

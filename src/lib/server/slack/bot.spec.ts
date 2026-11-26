@@ -11,6 +11,7 @@ import { connectionKey } from "./connections";
 import { skipSlackQuestion } from "./engine";
 import { getOrCreateThread } from "./store";
 import type { SlackThread } from "./types";
+import { MessageUpdateStatus, MessageUpdateType } from "$lib/types/MessageUpdate";
 import {
 	ANSWER_ACTION,
 	ANSWER_VIEW,
@@ -30,6 +31,7 @@ const mocks = vi.hoisted(() => ({
 	replies: vi.fn(),
 	post: vi.fn(),
 	update: vi.fn(),
+	delete: vi.fn().mockResolvedValue({}),
 	ephemeral: vi.fn(),
 	run: vi.fn(),
 	react: vi.fn(),
@@ -91,7 +93,12 @@ vi.mock("@slack/web-api", () => ({
 			replies: mocks.replies,
 			open: mocks.open,
 		};
-		chat = { postMessage: mocks.post, postEphemeral: mocks.ephemeral, update: mocks.update };
+		chat = {
+			postMessage: mocks.post,
+			postEphemeral: mocks.ephemeral,
+			update: mocks.update,
+			delete: mocks.delete,
+		};
 		views = { open: mocks.views };
 	},
 }));
@@ -1557,6 +1564,80 @@ it("keeps other workspace members' messages in shared-token context", async () =
 	expect(result.text).toContain("my dataset");
 	expect(result.text).toContain("owner note");
 });
+it("answers a refused login with one reconnect link in place of the failure posts", async () => {
+	const { user, locals, session } = await createTestUser();
+	const expiresAt = new Date(Date.now() + 3600_000);
+	await collections.sessions.updateOne(
+		{ _id: session._id },
+		{ $set: { oauth: { token: { value: "hf-revoked", expiresAt } } } }
+	);
+	await collections.slackConnections.insertOne({
+		_id: connectionKey("T123", "OWNER"),
+		teamId: "T123",
+		slackUserId: "OWNER",
+		userId: user._id,
+		sessionId: session.sessionId,
+		verifiedSlackIdentity: true,
+		updatedAt: new Date(),
+	});
+	const bot = new MlSlackBot({ ...settings, accountMode: "user", hfToken: "" });
+	const thread = await getOrCreateThread("T123", "C123", "100.0", "OWNER", user._id);
+	const messageId = crypto.randomUUID(),
+		generationId = crypto.randomUUID();
+	await createTestConversation(locals, {
+		_id: thread.conversationId,
+		messages: [
+			{
+				id: messageId,
+				generationId,
+				from: "assistant",
+				content: "",
+				createdAt: new Date(),
+				updates: [
+					{
+						type: MessageUpdateType.Status,
+						status: MessageUpdateStatus.Error,
+						message: "Unauthorized",
+						statusCode: 401,
+					},
+				],
+			},
+		],
+	});
+	await collections.turnStates.insertOne({
+		_id: new ObjectId(),
+		conversationId: thread.conversationId,
+		messageId,
+		producerId: generationId,
+		status: "failed",
+		createdAt: new Date(),
+		updatedAt: new Date(),
+	});
+
+	await collections.slackDeliveries.insertOne({
+		_id: `${thread._id}:status:${messageId}`,
+		threadId: thread._id,
+		messageId,
+		parts: ["111.0"],
+		updatedAt: new Date(),
+	});
+
+	await bot["render"](thread);
+	await bot["render"](thread);
+
+	const prompts = mocks.ephemeral.mock.calls.filter(([call]) =>
+		call.text.includes("Reconnect Hugging Face")
+	);
+	expect(prompts).toHaveLength(1);
+	expect(mocks.post).not.toHaveBeenCalled();
+	expect(mocks.update).not.toHaveBeenCalled();
+	expect(mocks.delete).toHaveBeenCalledExactlyOnceWith({ channel: "C123", ts: "111.0" });
+	expect(prompts[0][0]).toMatchObject({ user: "OWNER", channel: "C123", thread_ts: "100.0" });
+	expect(prompts[0][0].text).toContain("/slack/connect?ticket=");
+	const stored = await collections.sessions.findOne({ _id: session._id });
+	expect(stored?.oauth?.token.expiresAt.getTime()).toBeLessThan(expiresAt.getTime());
+});
+
 it("delivers personal raw traces only to the owner's DM", async () => {
 	const { user, locals } = await createTestUser();
 	const bot = new MlSlackBot(settings, user);

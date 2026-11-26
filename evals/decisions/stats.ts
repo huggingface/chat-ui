@@ -45,14 +45,16 @@ export function groupBy<T>(items: T[], key: (item: T) => string): T[][] {
 export const mean = (values: number[]): number | null =>
 	values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 
-/** one case in a paired comparison: each arm's verdicts on its samples */
+/** one case in a paired comparison, the verdicts or measured values of each arm */
 export interface PairedCase {
 	conversationId: string;
-	a: boolean[];
-	b: boolean[];
+	a: Array<boolean | number>;
+	b: Array<boolean | number>;
 }
 
-const share = (verdicts: boolean[]) => verdicts.filter(Boolean).length / verdicts.length;
+/** the share of right calls among verdicts, or the mean of values */
+const share = (values: Array<boolean | number>) =>
+	values.reduce<number>((sum, v) => sum + Number(v), 0) / values.length;
 const pick = <T>(list: T[]) => list[Math.floor(Math.random() * list.length)];
 const resample = <T>(list: T[]) => Array.from({ length: list.length }, () => pick(list));
 

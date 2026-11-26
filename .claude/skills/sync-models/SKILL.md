@@ -43,7 +43,7 @@ Both directions share the same source of truth: whatever `https://router.hugging
    raw = subprocess.check_output(["curl","-sS","https://router.huggingface.co/v1/models"]).decode()
    router = {m["id"] for m in json.loads(raw)["data"]}
    txt = open("chart/env/prod.yaml").read()
-   block = re.search(r"MODELS:\s*>\s*\n(.*?)\n\S", txt, re.S).group(1)
+   block = re.search(r"^  MODELS:\s*>\s*\n(.*?)\n\S", txt, re.S | re.M).group(1)  # anchored: ML_ASSISTANT_MODELS also ends in MODELS:
    ids = [e["id"] for e in json.loads(block)]
    keep = {"omni"}  # never treat the router alias (PUBLIC_LLM_ROUTER_ALIAS_ID) as deprecated
    print("MISSING (add):   ", sorted(router - set(ids)))

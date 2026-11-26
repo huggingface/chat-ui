@@ -12,6 +12,7 @@ import {
 	type HistoryUnit,
 } from "./historyWindow";
 import type { EndpointMessage } from "$lib/server/endpoints/endpoints";
+import { JOB_FAILED_NOTE, withJobFailedNote } from "../builtinTools/jobCheckPrompt";
 import type { makeImageProcessor } from "$lib/server/endpoints/images";
 import {
 	MessageToolUpdateType,
@@ -1471,6 +1472,33 @@ describe("harness events in replay", () => {
 		expect(round?.rounds).toBe(1);
 		expect(round?.start).toEqual({ messageId: "a0", round: 0 });
 		expect(textOf(round?.messages.at(-1))).toContain(EVENT_TEXT);
+	});
+});
+
+describe("failed job note in replay", () => {
+	const failed = (): HistoryMessage[] => [
+		user("u0", "train it"),
+		{
+			id: "a0",
+			from: "assistant",
+			content: "",
+			contentShape: 2,
+			updates: [
+				callUpdate("c1", "check_job", { job_id: "j1", task: "did it start?" }),
+				resultUpdate("c1", "check_job", "- Status: failed.\n- If it failed: ImportError"),
+			],
+		},
+	];
+
+	it("adds the note to a failed check_job report, as the live request does", async () => {
+		const replayed = await prepareMessagesWithFiles(failed(), imageProcessor, false, {
+			replayToolHistory: true,
+		});
+
+		expect(textOf(replayed[2])).toBe(
+			withJobFailedNote("check_job", "- Status: failed.\n- If it failed: ImportError")
+		);
+		expect(textOf(replayed[2])).toContain(JOB_FAILED_NOTE);
 	});
 });
 
