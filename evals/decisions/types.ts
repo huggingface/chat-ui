@@ -58,7 +58,7 @@ export interface DecisionCase {
 		sandboxedFiles?: string[];
 		/** distinct jobs failed on this path, this one included */
 		failedJobsSoFar?: number;
-		/** the v-file script the failed job ran, to tell a resubmit from running something else */
+		/** the v-file path the failed job ran, without its version tag, to tell a resubmit from running something else */
 		failedScript?: string;
 	};
 	/** up to three rounds after the decision, clipped: how it turned out, for review only */

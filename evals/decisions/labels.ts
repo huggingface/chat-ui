@@ -83,7 +83,9 @@ function labelAfterJobFailure(
 ): { label: string; pass: boolean | null } {
 	if (calls.some(isSandboxWork)) return { label: "reproduce-in-sandbox", pass: true };
 	const job = calls.find(isJobSubmit);
-	if (job && context.failedScript && scriptName(job) && scriptName(job) !== context.failedScript) {
+	const submitted = job ? jobScript(job) : undefined;
+	const failed = context.failedScript?.replace(VERSION_TAG, "");
+	if (submitted && failed && submitted !== failed) {
 		return { label: "different-job", pass: null };
 	}
 	if (job) {
@@ -96,6 +98,21 @@ function labelAfterJobFailure(
 		return { label: "investigate", pass: null };
 	}
 	return { label: "other", pass: null };
+}
+
+/** a version tag names another version of the same file, never another file */
+const VERSION_TAG = /@v\d+$/;
+
+/**
+ * The script a job runs, as after-job-failure compares it: the path a `v-file://` reference names,
+ * directories kept and version tag dropped. Resubmitting an edit of `baseline/train.py@v1` as
+ * `baseline/train.py@v2` runs that same script again, while `candidate/train.py@v2` is the same
+ * file name in another directory and so a different job. Only after-job-failure reads a script
+ * this way, and the miner records `failedScript` with the same call: first-gpu-job keeps the
+ * shared scriptName(), where a directory is not part of the script's identity.
+ */
+export function jobScript(call: ActionCall): string | undefined {
+	return JSON.stringify(call.args).match(/v-file:\/\/([\w./-]+?)(?:@v\d+)?"/)?.[1];
 }
 
 const INSPECT_TOOLS = new Set(["check_job", "hf_jobs", "read_file", "hf_fs"]);

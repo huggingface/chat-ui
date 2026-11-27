@@ -30,7 +30,15 @@ import {
 import { ToolResultStatus } from "$lib/types/Tool";
 import { toolRounds } from "$lib/utils/messageShape";
 import { FILE_NAME, toActionCall } from "./calls";
-import { isGpu, isJobSubmit, isSandboxWork, jobFlavor, label, scriptName } from "./labels";
+import {
+	isGpu,
+	isJobSubmit,
+	isSandboxWork,
+	jobFlavor,
+	jobScript,
+	label,
+	scriptName,
+} from "./labels";
 import { redact } from "./redact";
 import type { Action, ActionCall, DecisionCase, Family, Feedback } from "./types";
 
@@ -156,7 +164,7 @@ interface History {
 	/** file names sandbox calls mentioned, to tell whether a job's script was run in one first */
 	sandboxFiles: Set<string>;
 	failedJobs: Set<string>;
-	/** job id to the v-file script it ran, read off each submission's result */
+	/** job id to the v-file path it ran, read off each submission's result */
 	jobScripts: Map<string, string>;
 }
 
@@ -273,7 +281,9 @@ function walkTurn(message: Message, history: History, emit: boolean): Decision[]
 		const text = resultText(update);
 		if (call && text !== undefined && isJobSubmit(call)) {
 			const id = text.match(/\b[0-9a-f]{24}\b/)?.[0];
-			const script = scriptName(call);
+			// after-job-failure compares the path a job names, so the script a failed job ran is
+			// recorded the same way: a nested `v-file://` path would be lost to scriptName()
+			const script = jobScript(call);
 			if (id && script) history.jobScripts.set(id, script);
 		}
 		if (!call || !RUN_TOOLS.has(call.name) || text === undefined) continue;
@@ -319,7 +329,7 @@ function walkTurn(message: Message, history: History, emit: boolean): Decision[]
 	return decisions;
 }
 
-function casesFor(
+export function casesFor(
 	conversation: ExportedConversation,
 	exportFile: string,
 	feedback?: Feedback
@@ -486,7 +496,10 @@ async function main() {
 	console.log(JSON.stringify(summary, null, 2));
 }
 
-main().catch((error) => {
-	console.error(error);
-	process.exit(1);
-});
+// mine.spec.ts imports casesFor, so the miner only runs as the command, never on import
+if (!process.env.VITEST) {
+	main().catch((error) => {
+		console.error(error);
+		process.exit(1);
+	});
+}
