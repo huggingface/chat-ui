@@ -144,6 +144,25 @@ describe("after-job-failure", () => {
 		).toEqual({ label: "different-job", pass: null });
 	});
 
+	it("reads the script field, not a v-file in script_args, as the job's script", () => {
+		// script_args can name a config the model passes ahead of the script; the first
+		// v-file in the serialized call is not the script the job runs
+		const configured: ActionCall = {
+			name: "hf_jobs",
+			args: {
+				operation: "uv",
+				args: {
+					script_args: ["v-file://configs/sft.yaml"],
+					script: "v-file://train.py",
+					flavor: "a10g-small",
+				},
+			},
+		};
+		expect(
+			label("after-job-failure", calls(configured), { failedScript: "train.py" })
+		).toEqual({ label: "resubmit", pass: false });
+	});
+
 	it("reads an untagged nested v-file path under another name as a different job", () => {
 		const other = job({ flavor: "cpu-basic", script: "v-file://scripts/strip.py" });
 		expect(label("after-job-failure", calls(other), { failedScript: "train.py" })).toEqual({
