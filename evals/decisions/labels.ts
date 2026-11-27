@@ -104,15 +104,19 @@ function labelAfterJobFailure(
 const VERSION_TAG = /@v\d+$/;
 
 /**
- * The script a job runs, as after-job-failure compares it: the path a `v-file://` reference names,
- * directories kept and version tag dropped. Resubmitting an edit of `baseline/train.py@v1` as
- * `baseline/train.py@v2` runs that same script again, while `candidate/train.py@v2` is the same
- * file name in another directory and so a different job. Only after-job-failure reads a script
- * this way, and the miner records `failedScript` with the same call: first-gpu-job keeps the
- * shared scriptName(), where a directory is not part of the script's identity.
+ * The script a job runs, as after-job-failure compares it: the `script` field production's
+ * expander resolves (src/lib/server/mlFiles/expand.ts), not the first `v-file://` in the
+ * serialized call. For `hf_jobs uv` the inner `args` object holds the real payload, so a
+ * `v-file` in `script_args` — say a config the model passed ahead of the script — does not
+ * get mistaken for the script itself. Directories kept and version tag dropped: resubmitting
+ * `baseline/train.py@v1` as `baseline/train.py@v2` runs that same script, while
+ * `candidate/train.py@v2` is the same file name in another directory and so a different job.
+ * Only after-job-failure reads a script this way; first-gpu-job keeps the shared scriptName().
  */
 export function jobScript(call: ActionCall): string | undefined {
-	return JSON.stringify(call.args).match(/v-file:\/\/([\w./-]+?)(?:@v\d+)?"/)?.[1];
+	const script = nested(call).script ?? call.args.script;
+	if (typeof script !== "string") return undefined;
+	return script.match(/v-file:\/\/([\w./-]+?)(?:@v\d+)?$/)?.[1];
 }
 
 const INSPECT_TOOLS = new Set(["check_job", "hf_jobs", "read_file", "hf_fs"]);
